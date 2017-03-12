@@ -1,0 +1,10 @@
+language: java
+jdk:
+  - openjdk7
+  - oraclejdk8
+  - oraclejdk7
+script: mvn install -B -V
+notifications:
+  slack:
+    rooms: 
+      - secure: Q8SMQchcShvX4EVggGhrAfucG/8ihNa+uErOS35tKcsgLpd+sf3UETmJLaIixbLjVHRERYb5qtAsrRYwbFBObRXvfHJk2INJh33NnIjA32ObBp0IcwlXQ7FQTBG9IYgj9IJU1tJ9/DNa0Xco6SaziRkvr5EMtFLoa24HsAQxTxDHmnBz2BAq/Elw6/H6/BdsIaZ2sgP3wx3mKlIz988RjP9bYqWaAu81JqPAuEc0FMDobt814zxqomzDpzJQuSW12PzVA32eAa3T1tq43GeeWzOJ9vmtykknTiF+1SYTBhCCprKhWGb5pag91bGE0Bw51XsVc8tPh4WhHh84Bc2DPZAavohBupUAejZGADp/+G0hhOBtKLFsYrOhI8UfFzEXwuc92PR2Mi1dwb0iEax675OXiHTKe+Qw7YuSQHX+H1ADod8kmxlL1ARHKRvqnwuzcilIASNAJH2XanwROwWazZDJePQuATSIObX6kHbk3wG3JsXFGYdOGYmjlJwZz1WjyRRwcs4QlaMGxUft/PkF+02UCw8r7Boo8OCWO8knACt4MWqjtOoHTaddvWLvd2DMTNr4XZVQJAgQCjb8hf+4oBJ2qp03RQXaDusyLM5+cZxi741ufa0pQUi5Ijm0RWlxHv5juta1WPRTS8KWFOyum+bLr1vnO/zUrYuMR7WlaRE=
