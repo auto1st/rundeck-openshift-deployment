@@ -76,8 +76,6 @@ public class DeploymentTest {
                         .put("latestVersion", ++version);
 
             oc.setDeploymentConfig(deployConfig);
-
-            // oc.watchDeployment();
         }
         catch (Exception ex) {
 
