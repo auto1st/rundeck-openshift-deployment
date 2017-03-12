@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>br.com.raffs</groupId>
+    <artifactId>rundeck-openshift-deployment-plugin</artifactId>
+    <version>1.0</version>
+    <name>Rundeck Openshift Deployment </name>
+    <url>http://rundeck.org</url>
+    <inceptionYear>2017</inceptionYear>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>lib/</directory>
+                <includes>
+                    <include>*.jar</include>
+                </includes>
+                <excludes>
+                    <exclude>*rundeck-code*</exclude>
+                </excludes>
+                <targetPath>lib/</targetPath>
+            </resource>
+            <resource>
+                <directory>resources/</directory>
+                <targetPath>resources/</targetPath>
+            </resource>
+        </resources>
+        <plugins>
+            <plugin>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>2.3.2</version>
+                <configuration>
+                    <archive>
+                        <manifestEntries>
+                            <Rundeck-Plugin-Classnames>br.com.raffs.rundeck.plugin.OpenshiftDeployment</Rundeck-Plugin-Classnames>
+                            <Rundeck-Plugin-Version>1.2</Rundeck-Plugin-Version>
+                            <Rundeck-Plugin-Archive>true</Rundeck-Plugin-Archive>
+                            <Rundeck-Plugin-File-Version>1.0.0</Rundeck-Plugin-File-Version>
+                            <Rundeck-Plugin-Libs>lib/json-20160810.jar lib/okhttp-3.5.0.jar lib/okio-1.11.0.jar</Rundeck-Plugin-Libs>
+                            <Rundeck-Plugin-Author>Rafael Oliveira Silva (github.com/raffs)</Rundeck-Plugin-Author>
+                            <Rundeck-Plugin-URL>raffs.com.br</Rundeck-Plugin-URL>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <repositories>
+        <repository>
+            <id>jcenter</id>
+            <url>https://jcenter.bintray.com/</url>
+        </repository>
+    </repositories>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.rundeck</groupId>
+            <artifactId>rundeck-core</artifactId>
+            <version>2.6.9-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.json</groupId>
+            <artifactId>json</artifactId>
+            <version>20160810</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>3.6.0</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.jtwig</groupId>
+            <artifactId>jtwig-core</artifactId>
+            <version>5.85.3.RELEASE</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>1.7.12</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>21.0</version>
+        </dependency>
+    </dependencies>
+</project>
