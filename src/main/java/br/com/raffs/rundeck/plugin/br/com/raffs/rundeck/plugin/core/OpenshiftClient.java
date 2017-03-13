@@ -33,12 +33,12 @@ public class OpenshiftClient {
         if (project == null || service == null)
             throw new Exception(
                     String.format(
-                         "Either could not find the project/service %s/%s",
-                          project, service
+                            "Either could not find the project/service %s/%s",
+                            project, service
                     )
             );
 
-        String authorization = "Bearer fWyAQGCVg4WwMbI5P_ynMvPSAWahoSLMjeEIE_JB6fM";
+        String authorization = "Bearer " + this.token;
         this.client = new HTTPClient()
                 .withTimeout(this.timeout)
                 .withBaseUrl(this.serverUrl)
@@ -65,15 +65,15 @@ public class OpenshiftClient {
                 statusCode = response.getInt("statusCode");
             }
             else
-             throw new Exception(
-                     "Error on trying to connect with: " +
-                     this.joinPath("/oapi", "")
-             );
+                throw new Exception(
+                        "Error on trying to connect with: " +
+                                this.joinPath("/oapi", "")
+                );
         }
         else
-         throw new Exception(
-                 "Could not find valid open connection on " +
-                 "to httpclient inside the Openshift Client class"
+            throw new Exception(
+                    "Could not find valid open connection on " +
+                            "to httpclient inside the Openshift Client class"
             );
 
         return statusCode;
@@ -106,17 +106,64 @@ public class OpenshiftClient {
                     );
                 }
                 else
-                  throw new Exception(
-                        "Could not find the project instances" +
-                        " server connection returned error code: " + status
-                  );
+                    throw new Exception(
+                            "Could not find the project instances" +
+                                    " server connection returned error code: " + status
+                    );
             }
             else return true;
         }
         else
             throw new Exception(
-                "Could not find any instance of http client please usage build syntax"
+                    "Could not find any instance of http client please usage build syntax"
             );
+    }
+
+    /**
+     * Return true/false whethe the service already exists or not
+     * on the system.
+     *
+     * @param service
+     * @return
+     */
+    public boolean checkService(String service) throws Exception {
+        String path = this.joinPath("/oapi",
+                String.format(
+                        "/namespaces/%s/deploymentconfigs/%s",
+                        project, service
+                )
+        );
+
+        JSONObject response = client.get(path);
+        int status = response.getInt("statusCode");
+        if (status != 200) {
+            if (status == 401)
+                throw new Exception(
+                        String.format(
+                                "Receive error [%d] on try to return the Deployment Configuration: %s/%s",
+                                status, project, service
+                        )
+                );
+
+            else if (status == 403)
+                throw new Exception(
+                        String.format(
+                                "Receive error [%d] on try to return the Deployment Configuration: %s/%s",
+                                status, project, service
+                        )
+                );
+
+            else if (status == 404)
+                return false;
+
+            else throw new Exception(
+                        String.format(
+                                "Receive error [%d] on try to return the Deployment Configuration: %s/%s",
+                                status, project, service
+                        )
+                );
+        }
+        else return true;
     }
 
     /**
@@ -140,35 +187,35 @@ public class OpenshiftClient {
         if ((status = response.getInt("statusCode")) != 200) {
             if (status == 401)
                 throw new Exception(
-                   String.format(
-                       "Unauthorized to request the service: %s from the project %s ",
-                       service, project
-                   )
+                        String.format(
+                                "Unauthorized to request the service: %s from the project %s ",
+                                service, project
+                        )
                 );
 
             else if (status == 403)
                 throw new Exception(
-                  String.format(
-                     "The service %s is forbidden to access on the project: %s",
-                      service, project
-                  )
+                        String.format(
+                                "The service %s is forbidden to access on the project: %s",
+                                service, project
+                        )
                 );
 
             else if (status == 404) {
                 throw new Exception(
-                    String.format(
-                        "Unable to found the service: %s on project %s",
-                            service, project
-                    )
+                        String.format(
+                                "Unable to found the service: %s on project %s",
+                                service, project
+                        )
                 );
             }
 
             else throw new Exception(
-                String.format(
-                   "Receive error [%d] on try to return the Deployment Configuration: %s/%s",
-                        status, project, service
-                )
-            );
+                        String.format(
+                                "Receive error [%d] on try to return the Deployment Configuration: %s/%s",
+                                status, project, service
+                        )
+                );
         }
 
         return response;
@@ -195,34 +242,34 @@ public class OpenshiftClient {
         if ((status = response.getInt("statusCode")) != 200) {
             if (status == 401)
                 throw new Exception(
-                   String.format(
-                           "Unauthorized to update the Deployment Configuration from: %s on project %s",
-                           service, project
-                   )
+                        String.format(
+                                "Unauthorized to update the Deployment Configuration from: %s on project %s",
+                                service, project
+                        )
                 );
 
             else if (status == 403)
                 throw new Exception(
-                     String.format(
-                        "Access to update the service: %s on Project: %s",
-                             service, project
-                     )
+                        String.format(
+                                "Access to update the service: %s on Project: %s",
+                                service, project
+                        )
                 );
 
             else if (status == 404)
                 throw new Exception(
-                    String.format(
-                         "The resource %s/%s could not be found on the server",
-                            project, service
-                    )
+                        String.format(
+                                "The resource %s/%s could not be found on the server",
+                                project, service
+                        )
                 );
 
             else throw new Exception(
-                    String.format(
-                            "Receive error [%d] on try to return the Deployment Configuration: %s/%s",
-                            status, project, service
-                    )
-            );
+                        String.format(
+                                "Receive error [%d] on try to return the Deployment Configuration: %s/%s",
+                                status, project, service
+                        )
+                );
 
         }
 
