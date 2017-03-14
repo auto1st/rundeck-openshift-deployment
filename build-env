@@ -12,7 +12,8 @@ create_container() {
 
 deploy() {
     echo "Start build/deploy of package"
-    mvn install -B -V $* && (
+    
+    LIBS_FILE="$(ls lib/*.jar | tr '\n' ' ')" mvn install -B -V $* && (
         docker container exec rundeck rm -rf /var/lib/rundeck/libext/cache
         for file in target/*.jar; do
             echo "cleaning ${file} from rundeck plugin directory"

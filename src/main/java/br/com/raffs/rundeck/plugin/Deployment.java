@@ -309,8 +309,8 @@ public class Deployment implements StepPlugin {
                     ).call();
 
             // Define the file gitlab based location
-            String varsPath = String.format("%s/%s", gitlab_deployment_file, gitlab_deployment_file);
-            String deploymentPath = String.format("%s/%s", gitlab_deployment_file, gitlab_deployment_file);
+            String varsPath = String.format("%s/%s", gitlab_directory, gitlab_variable_file);
+            String deploymentPath = String.format("%s/%s", gitlab_directory, gitlab_deployment_file);
 
             // validate the environment files.
             if (! (new File(varsPath).exists())) {

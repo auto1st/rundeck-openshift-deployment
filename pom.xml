@@ -12,6 +12,23 @@
     <inceptionYear>2017</inceptionYear>
 
     <build>
+        <resources>
+            <resource>
+                <directory>lib/</directory>
+                <includes>
+                    <include>*.jar</include>
+                </includes>
+                <excludes>
+                    <exclude>*rundeck-code*</exclude>
+                </excludes>
+                <targetPath>lib/</targetPath>
+            </resource>
+            <resource>
+                <directory>resources/</directory>
+                <targetPath>resources/</targetPath>
+            </resource>
+        </resources>
+
         <plugins>
             <plugin>
                 <artifactId>maven-dependency-plugin</artifactId>
@@ -38,31 +55,14 @@
                             <Rundeck-Plugin-Version>1.2</Rundeck-Plugin-Version>
                             <Rundeck-Plugin-Archive>true</Rundeck-Plugin-Archive>
                             <Rundeck-Plugin-File-Version>1.0.0</Rundeck-Plugin-File-Version>
-                            <Rundeck-Plugin-Libs>lib/okio-1.11.0.jar lib/okhttp-3.6.0.jar lib/jtwig-core-5.85.3.RELEASE.jar lib/jtwig-reflection-5.85.3.RELEASE.jar lib/guava-21.0.jar lib/org.eclipse.jgit-4.6.1.201703071140-r.jar lib/yamlbeans-1.11.jar</Rundeck-Plugin-Libs>
                             <Rundeck-Plugin-Author>Rafael Oliveira Silva (github.com/raffs)</Rundeck-Plugin-Author>
                             <Rundeck-Plugin-URL>raffs.com.br</Rundeck-Plugin-URL>
+                            <Rundeck-Plugin-Libs>${env.LIBS_FILE}</Rundeck-Plugin-Libs>
                         </manifestEntries>
                     </archive>
                 </configuration>
             </plugin>
         </plugins>
-
-        <resources>
-            <resource>
-                <directory>lib/</directory>
-                <includes>
-                    <include>*.jar</include>
-                </includes>
-                <excludes>
-                    <exclude>*rundeck-code*</exclude>
-                </excludes>
-                <targetPath>lib/</targetPath>
-            </resource>
-            <resource>
-                <directory>resources/</directory>
-                <targetPath>resources/</targetPath>
-            </resource>
-        </resources>
     </build>
 
     <repositories>
