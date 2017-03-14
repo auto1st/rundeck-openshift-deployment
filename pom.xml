@@ -12,6 +12,41 @@
     <inceptionYear>2017</inceptionYear>
 
     <build>
+        <plugins>
+            <plugin>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>install</phase>
+                        <goals>
+                            <goal>copy-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>lib</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>2.3.2</version>
+                <configuration>
+                    <archive>
+                        <manifestEntries>
+                            <Rundeck-Plugin-Classnames>br.com.raffs.rundeck.plugin.Deployment</Rundeck-Plugin-Classnames>
+                            <Rundeck-Plugin-Version>1.2</Rundeck-Plugin-Version>
+                            <Rundeck-Plugin-Archive>true</Rundeck-Plugin-Archive>
+                            <Rundeck-Plugin-File-Version>1.0.0</Rundeck-Plugin-File-Version>
+                            <Rundeck-Plugin-Libs>lib/okio-1.11.0.jar lib/okhttp-3.6.0.jar lib/jtwig-core-5.85.3.RELEASE.jar lib/jtwig-reflection-5.85.3.RELEASE.jar lib/guava-21.0.jar lib/org.eclipse.jgit-4.6.1.201703071140-r.jar lib/yamlbeans-1.11.jar</Rundeck-Plugin-Libs>
+                            <Rundeck-Plugin-Author>Rafael Oliveira Silva (github.com/raffs)</Rundeck-Plugin-Author>
+                            <Rundeck-Plugin-URL>raffs.com.br</Rundeck-Plugin-URL>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
+        </plugins>
+
         <resources>
             <resource>
                 <directory>lib/</directory>
@@ -28,25 +63,6 @@
                 <targetPath>resources/</targetPath>
             </resource>
         </resources>
-        <plugins>
-            <plugin>
-                <artifactId>maven-jar-plugin</artifactId>
-                <version>2.3.2</version>
-                <configuration>
-                    <archive>
-                        <manifestEntries>
-                            <Rundeck-Plugin-Classnames>br.com.raffs.rundeck.plugin.OpenshiftDeployment</Rundeck-Plugin-Classnames>
-                            <Rundeck-Plugin-Version>1.2</Rundeck-Plugin-Version>
-                            <Rundeck-Plugin-Archive>true</Rundeck-Plugin-Archive>
-                            <Rundeck-Plugin-File-Version>1.0.0</Rundeck-Plugin-File-Version>
-                            <Rundeck-Plugin-Libs>lib/json-20160810.jar lib/okhttp-3.5.0.jar lib/okio-1.11.0.jar</Rundeck-Plugin-Libs>
-                            <Rundeck-Plugin-Author>Rafael Oliveira Silva (github.com/raffs)</Rundeck-Plugin-Author>
-                            <Rundeck-Plugin-URL>raffs.com.br</Rundeck-Plugin-URL>
-                        </manifestEntries>
-                    </archive>
-                </configuration>
-            </plugin>
-        </plugins>
     </build>
 
     <repositories>

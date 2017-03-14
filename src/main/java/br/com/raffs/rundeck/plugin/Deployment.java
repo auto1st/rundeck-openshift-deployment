@@ -20,7 +20,6 @@ package br.com.raffs.rundeck.plugin;
 import com.dtolabs.rundeck.core.execution.workflow.steps.StepException;
 import com.dtolabs.rundeck.core.execution.workflow.steps.StepFailureReason;
 import com.dtolabs.rundeck.core.plugins.Plugin;
-import com.dtolabs.rundeck.core.plugins.PluginException;
 import com.dtolabs.rundeck.core.plugins.configuration.PropertyScope;
 import com.dtolabs.rundeck.core.utils.FileUtils;
 import com.dtolabs.rundeck.plugins.ServiceNameConstants;
@@ -52,7 +51,7 @@ public class Deployment implements StepPlugin {
 
     // define the gitlab variable for the Plugin configuration.
     @PluginProperty(
-            name = "Gitlab Repository",
+            name = "git-repository",
             description = "Define the Gitlab Repository where the Configuration will be store",
             required = true,
             scope = PropertyScope.Framework
@@ -61,7 +60,7 @@ public class Deployment implements StepPlugin {
 
     // define the gitlab branch for the plugin configuration.
     @PluginProperty(
-            name = "Gitlab Branch",
+            name = "git-branch",
             description = "Define the branch that will be clone when Update Deployment Configuration file",
             required = true,
             defaultValue = "master",
@@ -71,7 +70,7 @@ public class Deployment implements StepPlugin {
 
     // define the gitlab username for authentication
     @PluginProperty(
-            name = "Gitlab Username",
+            name = "git-username",
             description = "Define the username that can clone the Repository on <b>Gitlab Repo</b>",
             scope = PropertyScope.Framework,
             required = true
@@ -80,7 +79,7 @@ public class Deployment implements StepPlugin {
 
     // define the gitlab password for authentication
     @PluginProperty(
-            name = "Gitlab Password",
+            name = "git-password",
             description = "Define the password for the user to authenticated on Gitlab Repository",
             required = true,
             scope = PropertyScope.Framework
@@ -89,7 +88,7 @@ public class Deployment implements StepPlugin {
 
     // define the directory where the repository will be clone
     @PluginProperty(
-            name = "Gitlab Stage Repository",
+            name = "git-directory",
             description = "Define where the file will be clone, when reaching the configuration file",
             required = true,
             defaultValue = "/tmp/rd-oc-deployment-dir",
@@ -117,7 +116,7 @@ public class Deployment implements StepPlugin {
 
     // define the openshift server url
     @PluginProperty(
-            name = "Openshift Server URL",
+            name = "openshift-server-url",
             description = "Define the Openshift Server Url (ex: https://console.openshift.com:8443",
             required = true,
             scope = PropertyScope.Framework
@@ -126,16 +125,17 @@ public class Deployment implements StepPlugin {
 
     // define the openshfit api version
     @PluginProperty(
-            name = "Openshift API Version",
+            name = "openshift-api-version",
             description = "Define the Openshift URL version (ex: v1, v2 -> oc.example.com:8443/oapi/v1)",
             required = true,
+            defaultValue = "v1",
             scope = PropertyScope.Framework
     )
     private String openshift_apiversion;    // GLOBAL
 
     // define the Openshfit Username
     @PluginProperty(
-            name = "Openshift Username",
+            name = "openshift-username",
             description = "Openshift username to log into the server api, and call the procedures",
             scope = PropertyScope.Framework
     )
@@ -143,7 +143,7 @@ public class Deployment implements StepPlugin {
 
     // define the Openshift User password
     @PluginProperty(
-            name = "Openshift Password",
+            name = "openshift-password",
             description = "Openshift user's password to log into the server api, and call the procedures",
             scope = PropertyScope.Framework
     )
@@ -151,7 +151,7 @@ public class Deployment implements StepPlugin {
 
     // define the Openshift token access
     @PluginProperty(
-            name = "Openshift Access Token",
+            name = "openshift-access-token",
             description = "When defined, will override the username/password and use the token to access the API resources",
             scope = PropertyScope.Framework
     )
@@ -175,7 +175,7 @@ public class Deployment implements StepPlugin {
 
     // define the network timeout paramters
     @PluginProperty(
-            name = "Network Timeout",
+            name = "network-timeout",
             description = "Define the Network timeout configuration (in seconds)",
             required = true,
             defaultValue = "30",
@@ -185,7 +185,7 @@ public class Deployment implements StepPlugin {
 
     // define the network max count attempts on watching the deployment
     @PluginProperty(
-            name = "Network Max Count Attempts",
+            name = "network-max-count-attempts",
             description = "Define the network max attempts to validate the Deployment (in seconds)",
             required = true,
             defaultValue = "120",
@@ -195,7 +195,7 @@ public class Deployment implements StepPlugin {
 
     // define the netwowrk attempts time inverval.
     @PluginProperty(
-            name = "Network Attempts Interval",
+            name = "network-attempts-interval",
             description = "Define the time interval between the status attempts (in seconds)",
             required = true,
             defaultValue = "5",
@@ -339,19 +339,17 @@ public class Deployment implements StepPlugin {
             YamlReader varsReader = new YamlReader(new FileReader(varsPath));
             Object vars = varsReader.read();
 
-            //  Read the Deployment file using template-engine to validate the blocks and
-            // dynamic content
+            //  Read the Deployment file using template-engine to validate the blocks and dynamic content
             JtwigTemplate template = JtwigTemplate.fileTemplate(new File(deploymentPath));
             JtwigModel model = JtwigModel.newModel()
                     .with("vars", vars)
                     .with("rundeck", rundeckVars);
-
             String deploymentFile = template.render(model);
 
             // Return the Deployment Configuration from the YAML file.
             JSONObject deployConfig = new JSONObject(new YamlReader(deploymentFile).read());
 
-            System.out.println("This is the Deployment Configuration");
+            System.out.println("This is the Deployment Configuration: " + deployConfig.toString(2));
         }
         catch (Exception ex) {
             ex.printStackTrace();
