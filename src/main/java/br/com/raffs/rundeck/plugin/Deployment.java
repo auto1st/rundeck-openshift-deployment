@@ -37,6 +37,7 @@ import org.jtwig.JtwigTemplate;
 
 import java.io.File;
 import java.io.FileReader;
+import java.util.HashMap;
 import java.util.Map;
 
 @Plugin(name = "openshift-deploy", service = ServiceNameConstants.WorkflowStep)
@@ -299,7 +300,7 @@ public class Deployment implements StepPlugin {
             }
 
             // Download the files from the Gitlab, when it's the Service Definition.
-            System.out.println("Sync projects definition on: " + gitlab_repo + " ...");
+            System.out.println("Downloading repository: " + gitlab_repo + " ...");
             Git git = Git.cloneRepository()
                     .setURI(gitlab_repo)
                     .setDirectory(tempFileDir)
@@ -332,9 +333,34 @@ public class Deployment implements StepPlugin {
                 );
             }
 
-            // TODO: Read all the rundeck paramters to passed on the template
-            JSONObject rundeckVars = new JSONObject();
+            // Instance the rundeck vars object mapping
+            // allocating the plugin parameters to usage.
+            JSONObject rundeckVars = new JSONObject() {{
+                put("gitlab_repo", gitlab_repo);
+                put("gitlab_branch", gitlab_branch);
+                put("gitlab_username", gitlab_username);
+                put("gitlab_directory", gitlab_directory);
+                put("gitlab_deployment_file", gitlab_deployment_file);
+                put("gitlab_variable_file", gitlab_variable_file);
 
+                put("openshift_server", openshift_server);
+                put("openshift_apiversion", openshift_apiversion);
+                put("openshift_project", openshift_project);
+                put("openshift_service", openshift_service);
+                put("openshift_username", openshift_username);
+            }};
+
+            // Read the rundeck job parameters from the JOB Context
+            HashMap<String, Map<String, String>> jobContext =
+                    (HashMap<String, Map<String, String>>) context.getDataContext();
+
+            if (jobContext.get("option") != null) {
+                HashMap<String, String> options = (HashMap<String, String>) jobContext.get("option");
+                for (String key : options.keySet()) {
+                    rundeckVars.put(key, options.get(key));
+                }
+            }
+            
             // Read the environment variables into map of variables.
             YamlReader varsReader = new YamlReader(new FileReader(varsPath));
             Object vars = varsReader.read();
@@ -347,7 +373,8 @@ public class Deployment implements StepPlugin {
             String deploymentFile = template.render(model);
 
             // Return the Deployment Configuration from the YAML file.
-            JSONObject deployConfig = new JSONObject(new YamlReader(deploymentFile).read());
+            Map<String, Object> deployment = (Map<String, Object>) new YamlReader(deploymentFile).read();
+            JSONObject deployConfig = new JSONObject(deployment);
 
             System.out.println("This is the Deployment Configuration: " + deployConfig.toString(2));
         }
