@@ -13,16 +13,17 @@ create_container() {
 deploy() {
     echo "Start build/deploy of package"
     
-    LIBS_FILE="$(ls lib/*.jar | tr '\n' ' ')" mvn install -B -V $* && (
-        docker container exec rundeck rm -rf /var/lib/rundeck/libext/cache
-        for file in target/*.jar; do
-            echo "cleaning ${file} from rundeck plugin directory"
-            sudo rm -rf /srv/docker/rundeck/plugins/$file
-            echo "Copying ${file} to rundeck plugin directory"
-            sudo cp $file /srv/docker/rundeck/plugins
-        done
-        docker container restart rundeck 
-    )
+        mvn clean install -B -V $* && 
+        (
+            docker container exec rundeck rm -rf /var/lib/rundeck/libext/cache
+            for file in target/*.jar; do
+                echo "cleaning ${file} from rundeck plugin directory"
+                sudo rm -rf /srv/docker/rundeck/plugins/$file
+                echo "Copying ${file} to rundeck plugin directory"
+                sudo cp $file /srv/docker/rundeck/plugins
+            done
+            docker container restart rundeck 
+        )
 }
 
 clean() {
@@ -35,6 +36,7 @@ clean() {
 }
 
 case $1 in
+    build) mvn clean install -B -V ;;
     create_container) create_container ;;
     deploy) deploy ;;
     clean) clean ;;

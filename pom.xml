@@ -11,18 +11,13 @@
     <url>http://rundeck.org</url>
     <inceptionYear>2017</inceptionYear>
 
+    <properties>
+        <maven.compiler.source>1.7</maven.compiler.source>
+        <maven.compiler.target>1.7</maven.compiler.target>
+    </properties>
+
     <build>
         <resources>
-            <resource>
-                <directory>lib/</directory>
-                <includes>
-                    <include>*.jar</include>
-                </includes>
-                <excludes>
-                    <exclude>*rundeck-code*</exclude>
-                </excludes>
-                <targetPath>lib/</targetPath>
-            </resource>
             <resource>
                 <directory>resources/</directory>
                 <targetPath>resources/</targetPath>
@@ -30,19 +25,41 @@
         </resources>
 
         <plugins>
+
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
                 <executions>
                     <execution>
-                        <phase>install</phase>
+                        <id>copy-dependencies</id>
+                        <phase>prepare-package</phase>
                         <goals>
                             <goal>copy-dependencies</goal>
                         </goals>
                         <configuration>
-                            <outputDirectory>lib</outputDirectory>
+                            <outputDirectory>${project.build.directory}/classes/lib</outputDirectory>
+                            <overWriteReleases>false</overWriteReleases>
+                            <overWriteSnapshots>true</overWriteSnapshots>
+                            <overWriteIfNewer>true</overWriteIfNewer>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>build-classpath</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>build-classpath</goal>
+                        </goals>
+                        <configuration>
+                            <outputProperty>plugin-libs</outputProperty>
+                            <prefix>lib</prefix>
+                            <pathSeparator>&#160;</pathSeparator>
                         </configuration>
                     </execution>
                 </executions>
+
+                <configuration>
+                    <excludeGroupIds>org.rundeck, org.slf4j</excludeGroupIds>
+                </configuration>
             </plugin>
 
             <plugin>
@@ -57,7 +74,8 @@
                             <Rundeck-Plugin-File-Version>1.0.0</Rundeck-Plugin-File-Version>
                             <Rundeck-Plugin-Author>Rafael Oliveira Silva (github.com/raffs)</Rundeck-Plugin-Author>
                             <Rundeck-Plugin-URL>raffs.com.br</Rundeck-Plugin-URL>
-                            <Rundeck-Plugin-Libs>${env.LIBS_FILE}</Rundeck-Plugin-Libs>
+                            <!-- <Rundeck-Plugin-Libs>${plugin-libs}</Rundeck-Plugin-Libs> -->
+                            <Rundeck-Plugin-Libs>lib/org.eclipse.jgit-4.6.1.201703071140-r.jar lib/json-20160810.jar lib/yamlbeans-1.11.jar lib/jtwig-core-5.85.3.RELEASE.jar lib/parboiled-java-1.1.7.jar lib/parboiled-core-1.1.7.jar lib/jtwig-reflection-5.85.3.RELEASE.jar lib/okhttp-3.6.0.jar lib/okio-1.11.0.jar lib/guava-21.0.jar lib/commons-lang3-3.1.jar lib/asm-5.0.3.jar lib/asm-analysis-5.0.3.jar lib/asm-tree-5.0.3.jar lib/asm-util-5.0.3.jar</Rundeck-Plugin-Libs>
                         </manifestEntries>
                     </archive>
                 </configuration>
@@ -87,13 +105,11 @@
             <groupId>org.json</groupId>
             <artifactId>json</artifactId>
             <version>20160810</version>
-            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>okhttp</artifactId>
             <version>3.6.0</version>
-            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.jtwig</groupId>
