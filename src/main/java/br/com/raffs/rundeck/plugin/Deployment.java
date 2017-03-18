@@ -51,7 +51,7 @@ public class Deployment implements StepPlugin {
     public final static String SERVICE_PROVIDER = "openshift-deployment";
 
     // define a list of file suported format extension
-    public static final List<String> EXTENSION_SUPORTED = Collections.unmodifiableList(
+    private static final List<String> EXTENSION_SUPORTED = Collections.unmodifiableList(
             new ArrayList<String>() {{
                 add("yaml");
                 add("yml");
@@ -96,31 +96,31 @@ public class Deployment implements StepPlugin {
 
     // define the gitlab password for authentication
     @PluginProperty(
-            name = "git-deploymentfile",
-            description = "Define the name of the Deployment file name.",
+            name = "Environment",
+            description = "Choose the environment to be Deployed",
             required = true,
-            defaultValue = "Deployment.yaml",
-            scope = PropertyScope.Framework
+            defaultValue = "production"
     )
-    private String gitlab_deployment_file;         // GLOBAL
+    private String gitlab_deployment_environment;
 
     // define the deployment configuration file
-    @RenderingOption(key = "groupName", value = "Gitlab")
     @PluginProperty(
-            name = "Project Directory",
-            description = "Define the path off the Deployment Configuration directory inside the Git Repository",
-            required = true
+            name = "git-deployfile",
+            description = "Define the filename to load from the repository",
+            required = true,
+            defaultValue = "Deployment",
+            scope = PropertyScope.Framework
     )
-    private String gitlab_project_dir;  // LOCAL
+    private String gitlab_deployment_file;  // LOCAL
 
     // define the Gitlab Deployment file path
-    @RenderingOption(key = "groupName", value = "Gitlab")
     @PluginProperty(
-            name = "Deployment Environment",
-            description = "Define the path off the variables file inside the Git Repository",
-            required = true
+            name = "git-varpath",
+            description = "Define the variables path of each environment variable.",
+            required = true,
+            defaultValue = "vars"
     )
-    private String gitlab_variable_file;    // LOCAL
+    private String gitlab_variables_dir;    // LOCAL
 
     // define the openshift server url
     @PluginProperty(
@@ -269,7 +269,9 @@ public class Deployment implements StepPlugin {
 
         // Define the temporary directory.
         String temp_dir = String.format("/tmp/ocdepl-%s", Long.toString(System.nanoTime()));
-        String repo_dir = String.format("%s/%s", temp_dir, gitlab_project_dir);
+        String repo_dir = String.format(
+                "%s/%s/%s", temp_dir, openshift_project, openshift_service
+        );
 
         // Trying to Download the Deployment Defition
         try {
@@ -287,7 +289,13 @@ public class Deployment implements StepPlugin {
             // Looking for the file on the plugins.
             String varsPath = null;
             for (String format : EXTENSION_SUPORTED) {
-                String path = String.format("%s/vars/%s.%s", repo_dir, gitlab_variable_file, format);
+                String path = String.format(
+                     "%s/%s/%s.%s",
+                        repo_dir,
+                        gitlab_variables_dir,
+                        gitlab_deployment_environment,
+                        format
+                );
 
                 if (new File(path).exists()) {
                     varsPath = path;
@@ -307,37 +315,20 @@ public class Deployment implements StepPlugin {
             }
 
             // Proper way to handle errors
-            if (deploymentPath == null || varsPath == null) {
-                if (deploymentPath == null) {
-                    String files = "";
-                    for (String format : EXTENSION_SUPORTED) {
-                        files = files +
-                                String.format("%s/%s.%s,", gitlab_project_dir, gitlab_deployment_file   , format);
-                    }
-
-                    throw new StepException(
-                       String.format(
-                              "Not able to found any of the file list: %s on %s",
-                              files, gitlab_repo
-                        ),
-                        StepFailureReason.ConfigurationFailure
-                    );
+            if (deploymentPath == null) {
+                String files = "";
+                for (String format : EXTENSION_SUPORTED) {
+                    files = files +
+                            String.format("%s/%s.%s,", repo_dir, gitlab_deployment_file   , format);
                 }
-                else {
-                    String files = "";
-                    for (String format : EXTENSION_SUPORTED) {
-                        files = files +
-                                String.format("%s/%s.%s,", gitlab_project_dir, gitlab_variable_file, format);
-                    }
 
-                    throw new StepException(
+                throw new StepException(
                         String.format(
-                            "Not able to found any of the file list: %s on %s",
-                            files, gitlab_repo
+                                "Not able to found any of the file list: %s on %s",
+                                files, gitlab_repo
                         ),
                         StepFailureReason.ConfigurationFailure
-                    );
-                }
+                );
             }
 
             // Instance the rundeck vars object mapping
@@ -348,7 +339,7 @@ public class Deployment implements StepPlugin {
                     put("gitlab_branch", gitlab_branch);
                     put("gitlab_username", gitlab_username);
                     put("gitlab_deployment_file", gitlab_deployment_file);
-                    put("gitlab_variable_file", gitlab_variable_file);
+                    put("gitlab_variable_file", gitlab_deployment_environment);
 
                     put("openshift_server", openshift_server);
                     put("openshift_apiversion", openshift_apiversion);
@@ -367,11 +358,13 @@ public class Deployment implements StepPlugin {
             }
 
             // Read the environment variables into map of variables.
-            YamlReader varsReader = new YamlReader(new FileReader(varsPath));
-            Object vars = varsReader.read();
+            Object vars = null;
+            if (varsPath != null) {
+                YamlReader varsReader = new YamlReader(new FileReader(varsPath));
+                vars = varsReader.read();
+            }
 
             //  Read the Deployment file using template-engine to validate the blocks and dynamic content
-            System.out.println(vars);
             JtwigTemplate template = JtwigTemplate.fileTemplate(new File(deploymentPath));
             JtwigModel model = JtwigModel.newModel()
                     .with("vars", vars)
@@ -379,7 +372,6 @@ public class Deployment implements StepPlugin {
             String deploymentFile = template.render(model);
 
             // Return the Deployment Configuration from the YAML file.
-            System.out.println(rundeckVars.toString(2));
             Map deployment = (Map) new YamlReader(deploymentFile).read();
             JSONObject deployConfig = new JSONObject(deployment);
 
