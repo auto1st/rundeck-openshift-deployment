@@ -17,6 +17,7 @@
 
 package br.com.raffs.rundeck.plugin;
 
+import br.com.raffs.rundeck.plugin.br.com.raffs.rundeck.plugin.core.OpenshiftClient;
 import com.dtolabs.rundeck.core.execution.workflow.steps.StepException;
 import com.dtolabs.rundeck.core.execution.workflow.steps.StepFailureReason;
 import com.dtolabs.rundeck.core.plugins.Plugin;
@@ -37,8 +38,7 @@ import org.jtwig.JtwigTemplate;
 
 import java.io.File;
 import java.io.FileReader;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 @Plugin(name = "openshift-deploy", service = ServiceNameConstants.WorkflowStep)
 @PluginDescription(
@@ -49,6 +49,13 @@ public class Deployment implements StepPlugin {
 
     // class constacts
     public final static String SERVICE_PROVIDER = "openshift-deployment";
+
+    // define a list of file suported format extension
+    public static final List<String> EXTENSION_SUPORTED = Collections.unmodifiableList(
+            new ArrayList<String>() {{
+                add("yaml");
+                add("yml");
+            }});
 
     // define the gitlab variable for the Plugin configuration.
     @PluginProperty(
@@ -87,29 +94,29 @@ public class Deployment implements StepPlugin {
     )
     private String gitlab_password;         // GLOBAL
 
-    // define the directory where the repository will be clone
+    // define the gitlab password for authentication
     @PluginProperty(
-            name = "git-directory",
-            description = "Define where the file will be clone, when reaching the configuration file",
+            name = "git-deploymentfile",
+            description = "Define the name of the Deployment file name.",
             required = true,
-            defaultValue = "/tmp/rd-oc-deployment-dir",
+            defaultValue = "Deployment.yaml",
             scope = PropertyScope.Framework
     )
-    private String gitlab_directory;        // GLOBAL
+    private String gitlab_deployment_file;         // GLOBAL
 
     // define the deployment configuration file
     @RenderingOption(key = "groupName", value = "Gitlab")
     @PluginProperty(
-            name = "Deployment Configuration Path",
-            description = "Define the path off the Deployment Configuration file inside the Git Repository",
+            name = "Project Directory",
+            description = "Define the path off the Deployment Configuration directory inside the Git Repository",
             required = true
     )
-    private String gitlab_deployment_file;  // LOCAL
+    private String gitlab_project_dir;  // LOCAL
 
     // define the Gitlab Deployment file path
     @RenderingOption(key = "groupName", value = "Gitlab")
     @PluginProperty(
-            name = "Deployment Variables Path",
+            name = "Deployment Environment",
             description = "Define the path off the variables file inside the Git Repository",
             required = true
     )
@@ -182,7 +189,7 @@ public class Deployment implements StepPlugin {
             defaultValue = "30",
             scope = PropertyScope.Framework
     )
-    private String network_timeout;             // GLOBAL
+    private int network_timeout;             // GLOBAL
 
     // define the network max count attempts on watching the deployment
     @PluginProperty(
@@ -192,7 +199,7 @@ public class Deployment implements StepPlugin {
             defaultValue = "120",
             scope = PropertyScope.Framework
     )
-    private String network_max_count_attemps;   // GLOBAL
+    private int network_max_count_attemps;   // GLOBAL
 
     // define the netwowrk attempts time inverval.
     @PluginProperty(
@@ -202,7 +209,7 @@ public class Deployment implements StepPlugin {
             defaultValue = "5",
             scope = PropertyScope.Framework
     )
-    private String network_attempts_time_interval;  // GLOBAL
+    private int network_attempts_time_interval;  // GLOBAL
 
     /**
      * Execute a step on Node
@@ -238,13 +245,6 @@ public class Deployment implements StepPlugin {
                     StepFailureReason.ConfigurationFailure
             );
 
-        // gitlab_repo is a required parameters.
-        if (gitlab_directory == null)
-            throw new StepException(
-                    "Configuration failed, missing the gitlab_directory variables on Rundeck Framework properties",
-                    StepFailureReason.ConfigurationFailure
-            );
-
         // openshift_Server is a required parameters.
         if (openshift_server == null)
             throw new StepException(
@@ -259,7 +259,6 @@ public class Deployment implements StepPlugin {
                     StepFailureReason.ConfigurationFailure
             );
 
-
         // One of the two authentication is need
         if (openshift_username == null && openshift_password == null && openshift_token == null)
             throw new StepException(
@@ -268,86 +267,95 @@ public class Deployment implements StepPlugin {
                     StepFailureReason.ConfigurationFailure
             );
 
-        // network_timeout is a required parameters.
-        if (network_timeout == null)
-            throw new StepException(
-                    "Configuration failed, missing the network_timeout variables on Rundeck Framework properties",
-                    StepFailureReason.ConfigurationFailure
-            );
-
-        // network max count attempts is a required parameters.
-        if (network_max_count_attemps == null)
-            throw new StepException(
-                    "Configuration failed, missing the network_max_count_attempts variables on Rundeck Framework properties",
-                    StepFailureReason.ConfigurationFailure
-            );
-
-        // network attempts time interval is a required parameters.
-        if (network_attempts_time_interval == null)
-            throw new StepException(
-                    "Configuration failed, missing the network_attempts_time_interval variables on Rundeck Framework properties",
-                    StepFailureReason.ConfigurationFailure
-            );
-
+        // Define the temporary directory.
+        String temp_dir = String.format("/tmp/ocdepl-%s", Long.toString(System.nanoTime()));
+        String repo_dir = String.format("%s/%s", temp_dir, gitlab_project_dir);
 
         // Trying to Download the Deployment Defition
         try {
-
-            // Clean-up first, remove existing cloning directory when exists.
-            File tempFileDir = new File(gitlab_directory);
-            if (tempFileDir.exists()) {
-                FileUtils.deleteDir(tempFileDir);
-            }
 
             // Download the files from the Gitlab, when it's the Service Definition.
             System.out.println("Downloading repository: " + gitlab_repo + " ...");
             Git git = Git.cloneRepository()
                     .setURI(gitlab_repo)
-                    .setDirectory(tempFileDir)
+                    .setDirectory(new File(temp_dir))
                     .setBranch(gitlab_branch)
                     .setCredentialsProvider(
                          new UsernamePasswordCredentialsProvider(gitlab_username, gitlab_password)
                     ).call();
 
-            // Define the file gitlab based location
-            String varsPath = String.format("%s/%s", gitlab_directory, gitlab_variable_file);
-            String deploymentPath = String.format("%s/%s", gitlab_directory, gitlab_deployment_file);
+            // Looking for the file on the plugins.
+            String varsPath = null;
+            for (String format : EXTENSION_SUPORTED) {
+                String path = String.format("%s/vars/%s.%s", repo_dir, gitlab_variable_file, format);
 
-            // validate the environment files.
-            if (! (new File(varsPath).exists())) {
-                throw new StepException(
-                        String.format(
-                            "Could not find the file: %s inside the repository: %s",
-                                gitlab_variable_file, gitlab_repo
-                        ),
-                        StepFailureReason.ConfigurationFailure
-                );
+                if (new File(path).exists()) {
+                    varsPath = path;
+                    break;
+                }
             }
-            else if (! (new File(deploymentPath).exists())) {
-                throw new StepException(
-                        String.format(
-                                "Could not find the file: %s inside the repository: %s",
-                                gitlab_deployment_file, gitlab_repo
+
+            // Looking for the deploymet variable
+            String deploymentPath = null;
+            for (String format : EXTENSION_SUPORTED) {
+                String path = String.format("%s/%s.%s", repo_dir, gitlab_deployment_file, format);
+
+                if (new File(path).exists()) {
+                    deploymentPath = path;
+                    break;
+                }
+            }
+
+            // Proper way to handle errors
+            if (deploymentPath == null || varsPath == null) {
+                if (deploymentPath == null) {
+                    String files = "";
+                    for (String format : EXTENSION_SUPORTED) {
+                        files = files +
+                                String.format("%s/%s.%s,", gitlab_project_dir, gitlab_deployment_file   , format);
+                    }
+
+                    throw new StepException(
+                       String.format(
+                              "Not able to found any of the file list: %s on %s",
+                              files, gitlab_repo
                         ),
                         StepFailureReason.ConfigurationFailure
-                );
+                    );
+                }
+                else {
+                    String files = "";
+                    for (String format : EXTENSION_SUPORTED) {
+                        files = files +
+                                String.format("%s/%s.%s,", gitlab_project_dir, gitlab_variable_file, format);
+                    }
+
+                    throw new StepException(
+                        String.format(
+                            "Not able to found any of the file list: %s on %s",
+                            files, gitlab_repo
+                        ),
+                        StepFailureReason.ConfigurationFailure
+                    );
+                }
             }
 
             // Instance the rundeck vars object mapping
             // allocating the plugin parameters to usage.
             JSONObject rundeckVars = new JSONObject() {{
-                put("gitlab_repo", gitlab_repo);
-                put("gitlab_branch", gitlab_branch);
-                put("gitlab_username", gitlab_username);
-                put("gitlab_directory", gitlab_directory);
-                put("gitlab_deployment_file", gitlab_deployment_file);
-                put("gitlab_variable_file", gitlab_variable_file);
+                put("plugin", new JSONObject() {{
+                    put("gitlab_repo", gitlab_repo);
+                    put("gitlab_branch", gitlab_branch);
+                    put("gitlab_username", gitlab_username);
+                    put("gitlab_deployment_file", gitlab_deployment_file);
+                    put("gitlab_variable_file", gitlab_variable_file);
 
-                put("openshift_server", openshift_server);
-                put("openshift_apiversion", openshift_apiversion);
-                put("openshift_project", openshift_project);
-                put("openshift_service", openshift_service);
-                put("openshift_username", openshift_username);
+                    put("openshift_server", openshift_server);
+                    put("openshift_apiversion", openshift_apiversion);
+                    put("openshift_project", openshift_project);
+                    put("openshift_service", openshift_service);
+                    put("openshift_username", openshift_username);
+                }});
             }};
 
             // Read the rundeck job parameters from the JOB Context
@@ -355,17 +363,15 @@ public class Deployment implements StepPlugin {
                     (HashMap<String, Map<String, String>>) context.getDataContext();
 
             if (jobContext.get("option") != null) {
-                HashMap<String, String> options = (HashMap<String, String>) jobContext.get("option");
-                for (String key : options.keySet()) {
-                    rundeckVars.put(key, options.get(key));
-                }
+                rundeckVars.put("option", jobContext.get("option"));
             }
-            
+
             // Read the environment variables into map of variables.
             YamlReader varsReader = new YamlReader(new FileReader(varsPath));
             Object vars = varsReader.read();
 
             //  Read the Deployment file using template-engine to validate the blocks and dynamic content
+            System.out.println(vars);
             JtwigTemplate template = JtwigTemplate.fileTemplate(new File(deploymentPath));
             JtwigModel model = JtwigModel.newModel()
                     .with("vars", vars)
@@ -373,18 +379,86 @@ public class Deployment implements StepPlugin {
             String deploymentFile = template.render(model);
 
             // Return the Deployment Configuration from the YAML file.
-            Map<String, Object> deployment = (Map<String, Object>) new YamlReader(deploymentFile).read();
+            System.out.println(rundeckVars.toString(2));
+            Map deployment = (Map) new YamlReader(deploymentFile).read();
             JSONObject deployConfig = new JSONObject(deployment);
 
             System.out.println("This is the Deployment Configuration: " + deployConfig.toString(2));
+
+            // connect to the Openshift client
+            System.out.print(
+                String.format(
+                   "Connecting to Openshift server: %s ...",
+                   openshift_server
+                )
+            );
+
+            // Define the Openshift
+            OpenshiftClient oc = new OpenshiftClient()
+                    .withProject(openshift_project)
+                    .withService(openshift_service)
+                    .withServerUrl(openshift_server)
+                    .withApiVersion(openshift_apiversion)
+                    .withTimeout(network_timeout)
+                    .build();
+
+            // Validate the service status
+            int serverStatus = -1;
+            if ((serverStatus = oc.getServerStatus()) != 200) {
+                throw new Exception(
+                     String.format(
+                             "[%d] Receive when trying to return server status",
+                             serverStatus
+                     )
+                );
+            }
+            else System.out.println("[OK]");
+
+            // Validate whether the project exists.
+            if (! oc.checkProject(openshift_project)) {
+                throw new Exception(
+                    String.format(
+                       "Appears that project does not exists, or access ir forbidden, %s",
+                       openshift_project
+                    )
+                );
+            }
+
+            // Create the project whether exists
+            if (! oc.checkService(openshift_service)) {
+                System.out.print(
+                    String.format(
+                        "Unable to found the project: %s, try to create the Deployment Configuration"
+                    )
+                );
+
+            } else {
+
+                // Update an already existed Deployment Configuration.
+                System.out.println(
+                   String.format(
+                      "Updated the resource: %s/%s", openshift_project, openshift_service
+                   )
+                );
+            }
+
         }
         catch (Exception ex) {
             ex.printStackTrace();
 
             throw new StepException(
-                    "Error on trying automate Openshift Deployment & Provision",
+                    "Error on trying automate Openshift Deployment & Provision\nError msg: " + ex.getMessage(),
                     StepFailureReason.PluginFailed
             );
+        }
+        finally {
+
+            // clean-up the house.
+            if (new File(repo_dir).exists()) {
+                FileUtils.deleteDir(new File(repo_dir));
+            }
+
+            System.out.println("That it");
         }
     }
 }
