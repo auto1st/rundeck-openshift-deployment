@@ -18,8 +18,12 @@
 package br.com.raffs.rundeck.plugin.br.com.raffs.rundeck.plugin.core;
 
 import okhttp3.*;
+import org.json.JSONException;
 import org.json.JSONObject;
 
+import javax.xml.bind.DatatypeConverter;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.concurrent.TimeUnit;
 
 public class HTTPClient {
@@ -157,7 +161,6 @@ public class HTTPClient {
                             "ensure the path is given on arguments"
             );
 
-        System.out.println(this.joinPath(path));
         RequestBody body;
         Request request;
         switch (type) {
@@ -166,6 +169,7 @@ public class HTTPClient {
                 if (this.authorization != null) {
                     request = new Request.Builder()
                             .addHeader("Authorization", this.authorization)
+                            .addHeader("Content-Type", "application/json")
                             .url(this.joinPath(path))
                             .post(body)
                             .build();
@@ -173,16 +177,19 @@ public class HTTPClient {
                 else {
                     request = new Request.Builder()
                             .url(this.joinPath(path))
+                            .addHeader("Content-Type", "application/json")
                             .post(body)
                             .build();
                 }
                 break;
 
             case PUT:
-                body = RequestBody.create(JSON, data.toString());
+
+                body = RequestBody.create(JSON, Utils.parserString(data.toString()));
                 if (this.authorization != null) {
                     request = new Request.Builder()
                             .addHeader("Authorization", this.authorization)
+                            .addHeader("Content-Type", "application/json")
                             .url(this.joinPath(path))
                             .put(body)
                             .build();
@@ -190,6 +197,7 @@ public class HTTPClient {
                 else {
                     request = new Request.Builder()
                             .url(this.joinPath(path))
+                            .addHeader("Content-Type", "application/json")
                             .put(body)
                             .build();
                 }
@@ -199,12 +207,14 @@ public class HTTPClient {
                 if (this.authorization != null) {
                     request = new Request.Builder()
                             .header("Authorization", this.authorization)
+                            .addHeader("Content-Type", "application/json")
                             .url(this.joinPath(path))
                             .build();
                 }
                 else {
                     request = new Request.Builder()
                             .url(this.joinPath(path))
+                            .addHeader("Content-Type", "application/json")
                             .build();
                 }
                 break;

@@ -18,6 +18,7 @@
 package br.com.raffs.rundeck.plugin;
 
 import br.com.raffs.rundeck.plugin.br.com.raffs.rundeck.plugin.core.OpenshiftClient;
+import br.com.raffs.rundeck.plugin.br.com.raffs.rundeck.plugin.core.Utils;
 import com.dtolabs.rundeck.core.execution.workflow.steps.StepException;
 import com.dtolabs.rundeck.core.execution.workflow.steps.StepFailureReason;
 import com.dtolabs.rundeck.core.plugins.Plugin;
@@ -26,7 +27,6 @@ import com.dtolabs.rundeck.core.utils.FileUtils;
 import com.dtolabs.rundeck.plugins.ServiceNameConstants;
 import com.dtolabs.rundeck.plugins.descriptions.PluginDescription;
 import com.dtolabs.rundeck.plugins.descriptions.PluginProperty;
-import com.dtolabs.rundeck.plugins.descriptions.RenderingOption;
 import com.dtolabs.rundeck.plugins.step.PluginStepContext;
 import com.dtolabs.rundeck.plugins.step.StepPlugin;
 import com.esotericsoftware.yamlbeans.YamlReader;
@@ -94,6 +94,16 @@ public class Deployment implements StepPlugin {
     )
     private String gitlab_password;         // GLOBAL
 
+    // define the Gitlab Deployment file path
+    @PluginProperty(
+            name = "git-varpath",
+            description = "Define the variables path of each environment variable.",
+            required = true,
+            defaultValue = "vars",
+            scope = PropertyScope.Framework
+    )
+    private String gitlab_variables_dir;    // GLOBAL
+
     // define the gitlab password for authentication
     @PluginProperty(
             name = "Environment",
@@ -112,15 +122,6 @@ public class Deployment implements StepPlugin {
             scope = PropertyScope.Framework
     )
     private String gitlab_deployment_file;  // LOCAL
-
-    // define the Gitlab Deployment file path
-    @PluginProperty(
-            name = "git-varpath",
-            description = "Define the variables path of each environment variable.",
-            required = true,
-            defaultValue = "vars"
-    )
-    private String gitlab_variables_dir;    // LOCAL
 
     // define the openshift server url
     @PluginProperty(
@@ -375,15 +376,8 @@ public class Deployment implements StepPlugin {
             Map deployment = (Map) new YamlReader(deploymentFile).read();
             JSONObject deployConfig = new JSONObject(deployment);
 
-            System.out.println("This is the Deployment Configuration: " + deployConfig.toString(2));
-
             // connect to the Openshift client
-            System.out.print(
-                String.format(
-                   "Connecting to Openshift server: %s ...",
-                   openshift_server
-                )
-            );
+            System.out.print(String.format("Connecting to Openshift server: %s ...", openshift_server));
 
             // Define the Openshift
             OpenshiftClient oc = new OpenshiftClient()
@@ -392,6 +386,9 @@ public class Deployment implements StepPlugin {
                     .withServerUrl(openshift_server)
                     .withApiVersion(openshift_apiversion)
                     .withTimeout(network_timeout)
+                    .withToken(openshift_token)
+                    .withUsername(openshift_username)
+                    .withPassword(openshift_password)
                     .build();
 
             // Validate the service status
@@ -399,8 +396,7 @@ public class Deployment implements StepPlugin {
             if ((serverStatus = oc.getServerStatus()) != 200) {
                 throw new Exception(
                      String.format(
-                             "[%d] Receive when trying to return server status",
-                             serverStatus
+                             "[%d] Receive when trying to return server status", serverStatus
                      )
                 );
             }
@@ -419,25 +415,48 @@ public class Deployment implements StepPlugin {
             // Create the project whether exists
             if (! oc.checkService(openshift_service)) {
                 System.out.print(
-                    String.format(
-                        "Unable to found the project: %s, try to create the Deployment Configuration"
-                    )
+                    String.format("Unable to found the project: %s, try to create the Deployment Configuration")
                 );
 
             } else {
 
                 // Update an already existed Deployment Configuration.
+                JSONObject  currentDeploy = oc.getDeploymentConfig();
+                if (currentDeploy != null) {
+                    deployConfig.put("metadata", currentDeploy.getJSONObject("metadata"));
+
+                    int latestVersion = currentDeploy.getJSONObject("status").getInt("latestVersion");
+                    deployConfig.getJSONObject("status").put("latestVersion", ++latestVersion);
+
+                    if (deployConfig.has("statusCode")) deployConfig.remove("statusCode");
+                    if (deployConfig.getJSONObject("spec")
+                                    .getJSONObject("template")
+                                    .getJSONObject("metadata")
+                                    .has("creationTimestamp")) {
+
+                            deployConfig.getJSONObject("spec")
+                                    .getJSONObject("template")
+                                    .getJSONObject("metadata")
+                                    .remove("creationTimestamp");
+                    }
+
+                    oc.setDeploymentConfig(deployConfig);
+                }
+                else {
+                    throw new Exception(
+                        "Error on try to get the Deployment Configuration"
+                    );
+                }
+
+
                 System.out.println(
                    String.format(
                       "Updated the resource: %s/%s", openshift_project, openshift_service
                    )
                 );
             }
-
         }
         catch (Exception ex) {
-            ex.printStackTrace();
-
             throw new StepException(
                     "Error on trying automate Openshift Deployment & Provision\nError msg: " + ex.getMessage(),
                     StepFailureReason.PluginFailed
@@ -445,12 +464,9 @@ public class Deployment implements StepPlugin {
         }
         finally {
 
-            // clean-up the house.
-            if (new File(repo_dir).exists()) {
-                FileUtils.deleteDir(new File(repo_dir));
-            }
+            // House cleaning when need.
+            if (new File(repo_dir).exists()) FileUtils.deleteDir(new File(repo_dir));
 
-            System.out.println("That it");
         }
     }
 }

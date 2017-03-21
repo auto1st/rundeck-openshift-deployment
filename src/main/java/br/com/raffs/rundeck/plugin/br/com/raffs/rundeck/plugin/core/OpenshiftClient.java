@@ -55,7 +55,14 @@ public class OpenshiftClient {
                     )
             );
 
-        String authorization = "Bearer " + this.token;
+        // define the authorization.
+        String authorization = null;
+        if (this.username != null && this.password != null)
+            authorization = Utils.getToken(
+                this.serverUrl, this.username, this.password, this.timeout
+            );
+        else authorization = "Bearer " + this.token;
+
         this.client = new HTTPClient()
                 .withTimeout(this.timeout)
                 .withBaseUrl(this.serverUrl)
@@ -76,7 +83,7 @@ public class OpenshiftClient {
         if (client != null) {
 
             JSONObject response = client.get(
-                    this.joinPath("/oapi", ""));
+                    this.joinPath("/oapi", "/"));
 
             if (response != null) {
                 statusCode = response.getInt("statusCode");
@@ -175,10 +182,11 @@ public class OpenshiftClient {
 
             else throw new Exception(
                         String.format(
-                                "Receive error [%d] on try to return the Deployment Configuration: %s/%s",
-                                status, project, service
+                                "Receive error [%d] on try to define the Deployment Configuration: %s/%s: " +
+                                "error message => %s",
+                                status, project, service, response.getString("message")
                         )
-                );
+            );
         }
         else return true;
     }
@@ -229,8 +237,9 @@ public class OpenshiftClient {
 
             else throw new Exception(
                         String.format(
-                                "Receive error [%d] on try to return the Deployment Configuration: %s/%s",
-                                status, project, service
+                                "Receive error [%d] on try to define the Deployment Configuration: %s/%s: %s" +
+                                        "error message => %s",
+                                status, project, service, response.getString("message")
                         )
                 );
         }
@@ -260,7 +269,8 @@ public class OpenshiftClient {
             if (status == 401)
                 throw new Exception(
                         String.format(
-                                "Unauthorized to update the Deployment Configuration from: %s on project %s",
+                                "Unauthorized to update the Deployment Configuration from: %s on project %s" +
+                                "error message => %s",
                                 service, project
                         )
                 );
@@ -283,8 +293,8 @@ public class OpenshiftClient {
 
             else throw new Exception(
                         String.format(
-                                "Receive error [%d] on try to return the Deployment Configuration: %s/%s",
-                                status, project, service
+                                "Receive error [%d] on try to define the Deployment Configuration: %s/%s: %s",
+                                status, project, service, response.getString("message")
                         )
                 );
 
@@ -393,5 +403,16 @@ public class OpenshiftClient {
             return String.format("%s/%s%s", api, apiVersion, path);
         }
         else return String.format("%s/v1/%s", api, path);
+    }
+
+    /**
+     * Define the API path based on type and versions.
+     *
+     * @param api
+     * @param path
+     * @return
+     */
+    private String joinPath(String path) {
+        return String.format(path);
     }
 }
