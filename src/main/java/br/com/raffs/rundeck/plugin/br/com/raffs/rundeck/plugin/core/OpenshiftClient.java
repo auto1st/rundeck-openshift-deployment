@@ -17,6 +17,7 @@
 
 package br.com.raffs.rundeck.plugin.br.com.raffs.rundeck.plugin.core;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 public class OpenshiftClient {
@@ -302,6 +303,114 @@ public class OpenshiftClient {
 
         return response;
     }
+
+    /**
+     * Responsible to watch the Deployment, basically execute
+     * the call to validate whether the numbers of updated containers
+     * is updated and ready to production.
+     *
+     * @return
+     */
+    public boolean notReady() throws Exception {
+        // Define the replicas updates.
+        int readyReplicas = 0;
+        int pendingReplicas = 0;
+        int failedReplicas = 0;
+
+        // Validate the deployment configs updates pods.
+        JSONObject response = getDeploymentConfig();
+        JSONObject podList = getPodStatus(response);
+
+        // go each pods and validate the status.
+        if (podList.has("items")) {
+            for (Object pods : podList.getJSONArray("items")) {
+                JSONObject pod = (JSONObject) pods;
+
+                if (pod.has("status")) {
+                    String podStatus = pod.getJSONObject("status").getString("phase");
+
+                    if (podStatus.equals("Pending"))
+                        pendingReplicas += 1;
+
+                    else if (podStatus.equals("Running")) {
+                        if (pod.getJSONObject("status").has("conditions")) {
+                            JSONArray objects = pod.getJSONObject("status").getJSONArray("conditions");
+
+                            // Go through each conditional to find the ready status.
+                            for (Object object : objects) {
+                                JSONObject condition = (JSONObject) object;
+
+                                if (condition.getString("type").equals("Ready")
+                                        && condition.getString("status").equals("True")) {
+
+                                    readyReplicas += 1;
+                                }
+                            }
+                        }
+                    }
+
+                    else if (podStatus.equals("Failed"))
+                        failedReplicas += 1;
+                }
+            }
+        }
+        else throw new Exception("Could not find any running/pending pods to validate !!!");
+
+        // throwing error on failed replicas.
+        if (failedReplicas > 0)
+             throw new Exception(
+                 String.format("[%d] replicas has failed deployment", failedReplicas)
+             );
+
+        // Change the deploy cycle when observed when it's finished.
+        int updatesReplicas = -1;
+        if (response.getJSONObject("status").has("updatedReplicas")) {
+            updatesReplicas = response.getJSONObject("status").getInt("updatedReplicas");
+        }
+
+        // define whether there's the same numbers of running and updated replicas.
+        return ! (pendingReplicas == 0 && readyReplicas == updatesReplicas);
+    }
+
+    /**
+     * Get Stauts from the running pods.
+     *
+     * @param deployConfig
+     * @return
+     * @throws Exception
+     */
+    public JSONObject getPodStatus(JSONObject deployConfig) throws Exception {
+        JSONObject returnResponse = null;
+
+        // Get parameters.
+        if (deployConfig.has("metadata") && deployConfig.has("status")) {
+            String project = deployConfig.getJSONObject("metadata").getString("namespace");
+            String resource = deployConfig.getJSONObject("metadata").getString("name");
+            int version = deployConfig.getJSONObject("status").getInt("latestVersion");
+
+            // Define the string format
+            String path = String.format("/api/v1/namespaces/%s/pods?labelSelector=deployment=%s-%d",
+                    project, resource, version);
+            returnResponse = client.get(path);
+
+            // Validate the request
+            int statusCode = (Integer) returnResponse.get("statusCode");
+            if (statusCode != 200) {
+
+                if (statusCode == 401 || statusCode == 403) {
+                    System.out.println("Unauthorized to rewrite the Deployment Configuration" +
+                            "Normally this happened when there's other Deployment already running");
+                }
+                else if (statusCode == 404) {
+                    System.out.println("Could not found Deployment Configuration");
+                }
+            }
+        }
+        else throw new Exception("Could not find metadata/status on deployment config json-schema");
+
+        return returnResponse;
+    }
+
 
     /**
      * Define the timeout connection on the Openshift API console.

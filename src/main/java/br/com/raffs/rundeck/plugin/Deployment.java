@@ -389,6 +389,7 @@ public class Deployment implements StepPlugin {
                     .withToken(openshift_token)
                     .withUsername(openshift_username)
                     .withPassword(openshift_password)
+
                     .build();
 
             // Validate the service status
@@ -413,6 +414,7 @@ public class Deployment implements StepPlugin {
             }
 
             // Create the project whether exists
+            JSONObject newReleaseResponse = null;
             if (! oc.checkService(openshift_service)) {
                 System.out.print(
                     String.format("Unable to found the project: %s, try to create the Deployment Configuration")
@@ -440,7 +442,7 @@ public class Deployment implements StepPlugin {
                                     .remove("creationTimestamp");
                     }
 
-                    oc.setDeploymentConfig(deployConfig);
+                    newReleaseResponse = oc.setDeploymentConfig(deployConfig);
                 }
                 else {
                     throw new Exception(
@@ -448,13 +450,26 @@ public class Deployment implements StepPlugin {
                     );
                 }
 
-
-                System.out.println(
-                   String.format(
-                      "Updated the resource: %s/%s", openshift_project, openshift_service
-                   )
-                );
             }
+
+            // Watch the deployment
+            if (newReleaseResponse.has("status")) {
+                if (newReleaseResponse.getJSONObject("status").has("latestVersion")) {
+                    System.out.println(String.format("Deployment #%d running, this could take some while...",
+                            newReleaseResponse.getJSONObject("status").getInt("latestVersion")));
+                }
+            }
+
+            // Watching the Deployment of the Services.
+            for (int attempts = 0; (oc.notReady() && attempts < network_max_count_attemps); ++attempts) {
+                Thread.sleep((network_attempts_time_interval * 1000));
+            }
+
+            System.out.println(
+                String.format(
+                    "Updated the resource: %s/%s successfully", openshift_project, openshift_service
+                )
+            );
         }
         catch (Exception ex) {
             throw new StepException(
@@ -466,7 +481,6 @@ public class Deployment implements StepPlugin {
 
             // House cleaning when need.
             if (new File(repo_dir).exists()) FileUtils.deleteDir(new File(repo_dir));
-
         }
     }
 }
