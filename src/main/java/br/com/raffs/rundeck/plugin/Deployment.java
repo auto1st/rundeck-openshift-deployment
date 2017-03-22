@@ -487,11 +487,7 @@ public class Deployment implements StepPlugin {
                 attempts += 1;
             }
 
-            System.out.println(
-                String.format(
-                    "Updated the resource: %s/%s successfully", openshift_project, openshift_service
-                )
-            );
+            dumpStatus(oc.getDeploymentConfig());
         }
         catch (Exception ex) {
             throw new StepException(
@@ -507,5 +503,46 @@ public class Deployment implements StepPlugin {
             }
             catch (Exception ex) { /* Do NOTHING */ }
         }
+    }
+
+    /**
+     * Dump information about the deployment
+     *
+     * @param deploymentConfig
+     */
+    private void dumpStatus(JSONObject deploymentConfig) {
+        System.out.println("\n+========== Deployment Successfully Finished ==========+");
+
+        try {
+
+            System.out.println("Name: " + deploymentConfig
+                    .getJSONObject("metadata").getString("name"));
+
+            System.out.println("Namespace: " + deploymentConfig
+                    .getJSONObject("metadata").getString("namespace"));
+
+            System.out.println("Latest Version: " + deploymentConfig
+                    .getJSONObject("status").getInt("latestVersion"));
+
+            System.out.println("Deployed Image: " + deploymentConfig
+                    .getJSONObject("spec").getJSONObject("template")
+                    .getJSONObject("spec").getJSONArray("containers")
+                    .getJSONObject(0).getString("image"));
+
+            System.out.println("Updated Replicas: " + deploymentConfig
+                    .getJSONObject("status").get("updatedReplicas"));
+
+            System.out.println("Available Replicas: " + deploymentConfig
+                    .getJSONObject("status").get("availableReplicas"));
+        }
+        catch (Exception ex) {/* do nothing */}
+
+        // That it.
+        System.out.println(
+                String.format(
+                        "========== + Updated the resource: %s/%s successfully ==========+",
+                        openshift_project, openshift_service
+                )
+        );
     }
 }
