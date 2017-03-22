@@ -107,11 +107,19 @@ public class Deployment implements StepPlugin {
     // define the gitlab password for authentication
     @PluginProperty(
             name = "Environment",
-            description = "Choose the environment to be Deployed",
+            description = "Define the deployment environment",
             required = true,
-            defaultValue = "production"
+            defaultValue = "development"
     )
     private String gitlab_deployment_environment;
+
+    // define the gitlab password for authentication
+    @PluginProperty(
+            name = "Directory",
+            description = "Define the Directory inside the Applications Repository",
+            required = true
+    )
+    private String gitlab_deployment_directory;
 
     // define the deployment configuration file
     @PluginProperty(
@@ -121,7 +129,7 @@ public class Deployment implements StepPlugin {
             defaultValue = "Deployment",
             scope = PropertyScope.Framework
     )
-    private String gitlab_deployment_file;  // LOCAL
+    private String gitlab_deployment_file;  // GLOBAL
 
     // define the openshift server url
     @PluginProperty(
@@ -270,16 +278,14 @@ public class Deployment implements StepPlugin {
 
         // Define the temporary directory.
         String temp_dir = String.format("/tmp/ocdepl-%s", Long.toString(System.nanoTime()));
-        String repo_dir = String.format(
-                "%s/%s/%s", temp_dir, openshift_project, openshift_service
-        );
+        String repo_dir = String.format("%s/%s", temp_dir, gitlab_deployment_directory);
 
-        // Trying to Download the Deployment Defition
+        // Trying to Download the Deployment definition
         try {
 
             // Download the files from the Gitlab, when it's the Service Definition.
             System.out.println("Downloading repository: " + gitlab_repo + " ...");
-            Git git = Git.cloneRepository()
+            Git.cloneRepository()
                     .setURI(gitlab_repo)
                     .setDirectory(new File(temp_dir))
                     .setBranch(gitlab_branch)
@@ -292,10 +298,7 @@ public class Deployment implements StepPlugin {
             for (String format : EXTENSION_SUPORTED) {
                 String path = String.format(
                      "%s/%s/%s.%s",
-                        repo_dir,
-                        gitlab_variables_dir,
-                        gitlab_deployment_environment,
-                        format
+                     repo_dir, gitlab_variables_dir, gitlab_deployment_environment, format
                 );
 
                 if (new File(path).exists()) {
@@ -393,7 +396,7 @@ public class Deployment implements StepPlugin {
                     .build();
 
             // Validate the service status
-            int serverStatus = -1;
+            int serverStatus;
             if ((serverStatus = oc.getServerStatus()) != 200) {
                 throw new Exception(
                      String.format(
@@ -414,26 +417,14 @@ public class Deployment implements StepPlugin {
             }
 
             // Create the project whether exists
-            JSONObject newReleaseResponse = null;
+            JSONObject newReleaseResponse;
             if (! oc.checkService(openshift_service)) {
-                System.out.print(
+                throw new StepException(
                     String.format(
-                         "Unable to found the project: %s/%s, trying to create the Deployment Configuration",
+                         "Unable to found the project: %s/%s !",
                             openshift_project, openshift_service
-                    )
+                    ), StepFailureReason.ConfigurationFailure
                 );
-
-                newReleaseResponse = oc.createDeploymentConfig(deployConfig);
-                if (newReleaseResponse.getInt("statusCode") != 200) {
-                    throw new StepException(
-                            String.format(
-                                    "Error on try to provision the Service %s/%s: message => %s",
-                                    openshift_project, openshift_service,
-                                    newReleaseResponse.getString("message")
-                            ), StepFailureReason.PluginFailed
-                    );
-                }
-                else System.out.println("Successfully create the Deployment Configuration");
 
             } else {
 
@@ -495,7 +486,10 @@ public class Deployment implements StepPlugin {
         finally {
 
             // House cleaning when need.
-            if (new File(repo_dir).exists()) FileUtils.deleteDir(new File(repo_dir));
+            try {
+                FileUtils.deleteDir(new File(repo_dir));
+            }
+            catch (Exception ex) { /* Do NOTHING */ }
         }
     }
 }

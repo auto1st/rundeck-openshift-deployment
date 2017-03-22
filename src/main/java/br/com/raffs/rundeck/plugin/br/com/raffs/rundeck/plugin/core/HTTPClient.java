@@ -165,7 +165,7 @@ public class HTTPClient {
         Request request;
         switch (type) {
             case POST:
-                body = RequestBody.create(JSON, data.toString());
+                body = RequestBody.create(JSON, Utils.parserString(data.toString()));
                 if (this.authorization != null) {
                     request = new Request.Builder()
                             .addHeader("Authorization", this.authorization)

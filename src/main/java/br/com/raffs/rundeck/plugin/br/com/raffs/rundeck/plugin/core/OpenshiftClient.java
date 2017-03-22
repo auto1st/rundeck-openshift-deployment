@@ -233,7 +233,7 @@ public class OpenshiftClient {
     public JSONObject createDeploymentConfig(JSONObject deployConfig) throws Exception {
         JSONObject response;
         String path = this.joinPath("/oapi",
-            String.format("/oapi/v1/namespaces/%s/deploymentconfigs", project)
+            String.format("/namespaces/%s/deploymentconfigs", project)
         );
         response = client.post(path, deployConfig);
 

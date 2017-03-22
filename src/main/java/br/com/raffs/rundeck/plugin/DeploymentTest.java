@@ -100,7 +100,7 @@ public class DeploymentTest {
                     .withServerUrl("https://10.2.2.2:8443")
                     .withTimeout(30)
                     .withProject("my-ap")
-                    .withService("jenkins2")
+                    .withService("jenkins")
                     .withUsername("admin")
                     .withPassword("admin")
 
@@ -117,31 +117,36 @@ public class DeploymentTest {
                 System.out.println("Project exists");
             }
 
-            System.out.println(oc.createDeploymentConfig(json).toString(2));
+            // System.out.println(oc.createDeploymentConfig(json).toString(2));
 
-//            if (! oc.checkService("jenkins")) {
-//                System.out.println("Unable to found the service: jenkins");
-//
-//                System.out.println("Trying to create the Deployment Configuration");
-//
-//                // TODO: Process the create a service.
-//            }
-//            else {
-//
-//                JSONObject deployConfig = oc.getDeploymentConfig();
-//
-//                System.out.println(deployConfig.getJSONObject("status").toString(2));
-//
-//                int version = deployConfig.getJSONObject("status")
-//                        .getInt("latestVersion");
-//
-//                deployConfig.getJSONObject("status")
-//                        .put("latestVersion", ++version);
-//
-//                oc.setDeploymentConfig(deployConfig);
-//
-//                // oc.watchDeployment();
-//            }
+            JSONObject deployment = oc.getDeploymentConfig();
+            System.out.println(deployment.toString(2));
+
+            deployment.getJSONObject("status")
+                    .put("latestVersion", 1);
+            System.out.println(oc.setDeploymentConfig(deployment));
+
+            if (! oc.checkService("jenkins")) {
+                System.out.println("Unable to found the service: jenkins");
+
+                System.out.println("Trying to create the Deployment Configuration");
+
+                // TODO: Process the create a service.
+            }
+            else {
+
+                JSONObject deployConfig = oc.getDeploymentConfig();
+
+                System.out.println(deployConfig.getJSONObject("status").toString(2));
+
+                int version = deployConfig.getJSONObject("status")
+                        .getInt("latestVersion");
+
+                deployConfig.getJSONObject("status")
+                        .put("latestVersion", ++version);
+
+                oc.setDeploymentConfig(deployConfig);
+            }
         }
         catch (Exception ex) {
 
