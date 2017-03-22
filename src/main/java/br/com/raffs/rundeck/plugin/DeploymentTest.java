@@ -78,12 +78,29 @@ public class DeploymentTest {
 
         try {
 
+            // read vars file.
+            YamlReader reader = new YamlReader(
+                    new FileReader("/tmp/applications/my-ap/jenkins2/vars/production.yaml"));
+            Object vars = reader.read();
+            Map map = (Map)vars;
+
+            JtwigTemplate template = JtwigTemplate.fileTemplate(
+                    new File("/tmp/applications/my-ap/jenkins2/Deployment.yaml"));
+            JtwigModel model = JtwigModel.newModel()
+                    .with("envs", vars);
+
+            String templ = template.render(model);
+
+            // translate the YAML to json
+            YamlReader _reader = new YamlReader(templ);
+            JSONObject json = new JSONObject((Map) _reader.read());
+
             OpenshiftClient oc = new OpenshiftClient()
                     .withApiVersion("v1")
                     .withServerUrl("https://10.2.2.2:8443")
                     .withTimeout(30)
                     .withProject("my-ap")
-                    .withService("jenkins")
+                    .withService("jenkins2")
                     .withUsername("admin")
                     .withPassword("admin")
 
@@ -99,6 +116,8 @@ public class DeploymentTest {
             if (oc.checkProject("my-ap")) {
                 System.out.println("Project exists");
             }
+
+            System.out.println(oc.createDeploymentConfig(json).toString(2));
 
 //            if (! oc.checkService("jenkins")) {
 //                System.out.println("Unable to found the service: jenkins");

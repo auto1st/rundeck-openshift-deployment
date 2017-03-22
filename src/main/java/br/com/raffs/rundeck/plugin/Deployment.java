@@ -417,8 +417,23 @@ public class Deployment implements StepPlugin {
             JSONObject newReleaseResponse = null;
             if (! oc.checkService(openshift_service)) {
                 System.out.print(
-                    String.format("Unable to found the project: %s, try to create the Deployment Configuration")
+                    String.format(
+                         "Unable to found the project: %s/%s, trying to create the Deployment Configuration",
+                            openshift_project, openshift_service
+                    )
                 );
+
+                newReleaseResponse = oc.createDeploymentConfig(deployConfig);
+                if (newReleaseResponse.getInt("statusCode") != 200) {
+                    throw new StepException(
+                            String.format(
+                                    "Error on try to provision the Service %s/%s: message => %s",
+                                    openshift_project, openshift_service,
+                                    newReleaseResponse.getString("message")
+                            ), StepFailureReason.PluginFailed
+                    );
+                }
+                else System.out.println("Successfully create the Deployment Configuration");
 
             } else {
 

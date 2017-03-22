@@ -112,35 +112,23 @@ public class OpenshiftClient {
     public boolean checkProject(String project) throws Exception {
         if (client != null) {
             String path = this.joinPath("/oapi", "/projects/" + project);
-            int status = client.get(path).getInt("statusCode");
-            if (status != 200) {
+            JSONObject response = client.get(path);
 
-                if (status == 403 || status == 401)
-                    throw new Exception(
-                            String.format(
-                                    "[%d] Unauthorized to validate the project: on %s on %s",
-                                    status, project, serverUrl
-                            )
-                    );
-                else if (status == 404){
-                    throw new Exception(
-                            String.format(
-                                    "[%d] Unauthorized to validate the project: on %s on %s",
-                                    status, project, serverUrl
-                            )
-                    );
-                }
-                else
-                    throw new Exception(
-                            "Could not find the project instances" +
-                                    " server connection returned error code: " + status
-                    );
+            int status;
+            if ((status = response.getInt("statusCode")) != 200) {
+                throw new Exception(
+                     String.format(
+                            "Receive error '%d' on try to validate whether the project '%s' exists: "
+                                    + "openshift message => %s",
+                            status, project, response.getString("message")
+                     )
+                );
             }
             else return true;
         }
         else
             throw new Exception(
-                    "Could not find any instance of http client please usage build syntax"
+                "Could not find any instance of http client please usage build syntax"
             );
     }
 
@@ -160,33 +148,14 @@ public class OpenshiftClient {
         );
 
         JSONObject response = client.get(path);
-        int status = response.getInt("statusCode");
-        if (status != 200) {
-            if (status == 401)
-                throw new Exception(
-                        String.format(
-                                "Receive error [%d] on try to return the Deployment Configuration: %s/%s",
-                                status, project, service
-                        )
-                );
-
-            else if (status == 403)
-                throw new Exception(
-                        String.format(
-                                "Receive error [%d] on try to return the Deployment Configuration: %s/%s",
-                                status, project, service
-                        )
-                );
-
-            else if (status == 404)
-                return false;
-
-            else throw new Exception(
-                        String.format(
-                                "Receive error [%d] on try to define the Deployment Configuration: %s/%s: " +
-                                "error message => %s",
-                                status, project, service, response.getString("message")
-                        )
+        int status;
+        if ((status = response.getInt("statusCode")) != 200) {
+            throw new Exception(
+                    String.format(
+                            "Receive error '%d' on try to validate whether the service %s/%s exists: "
+                                    + "openshift message => %s",
+                            status, project, service, response.getString("message")
+                    )
             );
         }
         else return true;
@@ -211,38 +180,13 @@ public class OpenshiftClient {
 
         int status;
         if ((status = response.getInt("statusCode")) != 200) {
-            if (status == 401)
-                throw new Exception(
-                        String.format(
-                                "Unauthorized to request the service: %s from the project %s ",
-                                service, project
-                        )
-                );
-
-            else if (status == 403)
-                throw new Exception(
-                        String.format(
-                                "The service %s is forbidden to access on the project: %s",
-                                service, project
-                        )
-                );
-
-            else if (status == 404) {
-                throw new Exception(
-                        String.format(
-                                "Unable to found the service: %s on project %s",
-                                service, project
-                        )
-                );
-            }
-
-            else throw new Exception(
-                        String.format(
-                                "Receive error [%d] on try to define the Deployment Configuration: %s/%s: %s" +
-                                        "error message => %s",
-                                status, project, service, response.getString("message")
-                        )
-                );
+            throw new Exception(
+                    String.format(
+                            "Receive error '%d' on try get a Deployment Configuration on %s/%s: "
+                                    + "openshift message => %s",
+                            status, project, service, response.getString("message")
+                    )
+            );
         }
 
         return response;
@@ -267,38 +211,41 @@ public class OpenshiftClient {
 
         int status;
         if ((status = response.getInt("statusCode")) != 200) {
-            if (status == 401)
-                throw new Exception(
-                        String.format(
-                                "Unauthorized to update the Deployment Configuration from: %s on project %s" +
-                                "error message => %s",
-                                service, project
-                        )
-                );
+            throw new Exception(
+                    String.format(
+                            "Receive error '%d' on try to update a Deployment Configuration on %s/%s: "
+                                    + "openshift message => %s",
+                            status, project, service, response.getString("message")
+                    )
+            );
+        }
 
-            else if (status == 403)
-                throw new Exception(
-                        String.format(
-                                "Access to update the service: %s on Project: %s",
-                                service, project
-                        )
-                );
+        return response;
+    }
 
-            else if (status == 404)
-                throw new Exception(
-                        String.format(
-                                "The resource %s/%s could not be found on the server",
-                                project, service
-                        )
-                );
+    /**
+     * Given a Deployment Configuration, responsible to update the
+     * Deployment Configuration from the existing file.
+     *
+     * @param deployConfig
+     * @return
+     */
+    public JSONObject createDeploymentConfig(JSONObject deployConfig) throws Exception {
+        JSONObject response;
+        String path = this.joinPath("/oapi",
+            String.format("/oapi/v1/namespaces/%s/deploymentconfigs", project)
+        );
+        response = client.post(path, deployConfig);
 
-            else throw new Exception(
-                        String.format(
-                                "Receive error [%d] on try to define the Deployment Configuration: %s/%s: %s",
-                                status, project, service, response.getString("message")
-                        )
+        int status;
+        if ((status = response.getInt("statusCode")) != 200) {
+            throw new Exception(
+                  String.format(
+                     "Receive error '%d' on try to create a new Deployment Configuration on %s/%s: "
+                             + "openshift message => %s",
+                         status, project, service, response.getString("message")
+                     )
                 );
-
         }
 
         return response;
@@ -459,7 +406,7 @@ public class OpenshiftClient {
     /**
      * Define the service.
      *
-     * @param servce
+     * @param service
      * @return
      */
     public OpenshiftClient withService(String service) {
