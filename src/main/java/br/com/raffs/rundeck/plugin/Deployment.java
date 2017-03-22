@@ -18,7 +18,6 @@
 package br.com.raffs.rundeck.plugin;
 
 import br.com.raffs.rundeck.plugin.br.com.raffs.rundeck.plugin.core.OpenshiftClient;
-import br.com.raffs.rundeck.plugin.br.com.raffs.rundeck.plugin.core.Utils;
 import com.dtolabs.rundeck.core.execution.workflow.steps.StepException;
 import com.dtolabs.rundeck.core.execution.workflow.steps.StepFailureReason;
 import com.dtolabs.rundeck.core.plugins.Plugin;
@@ -43,14 +42,15 @@ import java.util.*;
 @Plugin(name = "openshift-deploy", service = ServiceNameConstants.WorkflowStep)
 @PluginDescription(
         title = "Openshift Deployment Orchestration",
-        description = "Responsible to provision and deployment configuration on Openshift"
+        description = "Responsible to control the Openshift Deployment Configuration and Deployment Actions"
 )
 public class Deployment implements StepPlugin {
 
-    // class constacts
+    // Class provider name
     public final static String SERVICE_PROVIDER = "openshift-deployment";
 
-    // define a list of file suported format extension
+    // define a list of file supported format, that will be used
+    // to locate the yaml-formated file inside the source repository.
     private static final List<String> EXTENSION_SUPORTED = Collections.unmodifiableList(
             new ArrayList<String>() {{
                 add("yaml");
@@ -60,7 +60,7 @@ public class Deployment implements StepPlugin {
     // define the gitlab variable for the Plugin configuration.
     @PluginProperty(
             name = "git-repository",
-            description = "Define the Gitlab Repository where the Configuration will be store",
+            description = "GIT Repository URL where the configuration will be stored",
             required = true,
             scope = PropertyScope.Framework
     )
@@ -69,7 +69,7 @@ public class Deployment implements StepPlugin {
     // define the gitlab branch for the plugin configuration.
     @PluginProperty(
             name = "git-branch",
-            description = "Define the branch that will be clone when Update Deployment Configuration file",
+            description = "Which branch will use when cloning the repository",
             required = true,
             defaultValue = "master",
             scope = PropertyScope.Framework
@@ -79,16 +79,16 @@ public class Deployment implements StepPlugin {
     // define the gitlab username for authentication
     @PluginProperty(
             name = "git-username",
-            description = "Define the username that can clone the Repository on <b>Gitlab Repo</b>",
-            scope = PropertyScope.Framework,
-            required = true
+            description = "Username to authenticate when cloning the GIT Repository",
+            required = true,
+            scope = PropertyScope.Framework
     )
     private String gitlab_username;         // GLOBAL
 
     // define the gitlab password for authentication
     @PluginProperty(
             name = "git-password",
-            description = "Define the password for the user to authenticated on Gitlab Repository",
+            description = "Password to authenticate when cloning the GIT Repository",
             required = true,
             scope = PropertyScope.Framework
     )
@@ -97,103 +97,28 @@ public class Deployment implements StepPlugin {
     // define the Gitlab Deployment file path
     @PluginProperty(
             name = "git-varpath",
-            description = "Define the variables path of each environment variable.",
+            description = "The variables directory path inside the project directories",
             required = true,
             defaultValue = "vars",
             scope = PropertyScope.Framework
     )
     private String gitlab_variables_dir;    // GLOBAL
 
-    // define the gitlab password for authentication
-    @PluginProperty(
-            name = "Environment",
-            description = "Define the deployment environment",
-            required = true,
-            defaultValue = "development"
-    )
-    private String gitlab_deployment_environment;
-
-    // define the gitlab password for authentication
-    @PluginProperty(
-            name = "Directory",
-            description = "Define the Directory inside the Applications Repository",
-            required = true
-    )
-    private String gitlab_deployment_directory;
-
     // define the deployment configuration file
     @PluginProperty(
             name = "git-deployfile",
-            description = "Define the filename to load from the repository",
+            description = "Deployment filename inside each project directory \n" +
+                            "(Attention, Define the filename without the file extension)",
             required = true,
             defaultValue = "Deployment",
             scope = PropertyScope.Framework
     )
     private String gitlab_deployment_file;  // GLOBAL
 
-    // define the openshift server url
-    @PluginProperty(
-            name = "openshift-server-url",
-            description = "Define the Openshift Server Url (ex: https://console.openshift.com:8443",
-            required = true,
-            scope = PropertyScope.Framework
-    )
-    private String openshift_server;        // GLOBAL
-
-    // define the openshfit api version
-    @PluginProperty(
-            name = "openshift-api-version",
-            description = "Define the Openshift URL version (ex: v1, v2 -> oc.example.com:8443/oapi/v1)",
-            required = true,
-            defaultValue = "v1",
-            scope = PropertyScope.Framework
-    )
-    private String openshift_apiversion;    // GLOBAL
-
-    // define the Openshfit Username
-    @PluginProperty(
-            name = "openshift-username",
-            description = "Openshift username to log into the server api, and call the procedures",
-            scope = PropertyScope.Framework
-    )
-    private String openshift_username;      // GLOBAL
-
-    // define the Openshift User password
-    @PluginProperty(
-            name = "openshift-password",
-            description = "Openshift user's password to log into the server api, and call the procedures",
-            scope = PropertyScope.Framework
-    )
-    private String openshift_password;      // GLOBAL
-
-    // define the Openshift token access
-    @PluginProperty(
-            name = "openshift-access-token",
-            description = "When defined, will override the username/password and use the token to access the API resources",
-            scope = PropertyScope.Framework
-    )
-    private String openshift_token;         // GLOBAL
-
-    // define the Openshift project name.
-    @PluginProperty(
-            name = "Openshift Project Name",
-            description = "Define the project name where the service is located on Openshift System",
-            required = true
-    )
-    private String openshift_project;       // LOCAL
-
-    // define the Openshift service name
-    @PluginProperty(
-            name = "Openshift Service Name",
-            description = "Define the Openshift service name that will be provisioned or updated",
-            required = true
-    )
-    private String openshift_service;       // LOCAL
-
     // define the network timeout paramters
     @PluginProperty(
             name = "network-timeout",
-            description = "Define the Network timeout configuration (in seconds)",
+            description = "Network Timeout (in seconds) on try to connect with the components.",
             required = true,
             defaultValue = "30",
             scope = PropertyScope.Framework
@@ -203,7 +128,9 @@ public class Deployment implements StepPlugin {
     // define the network max count attempts on watching the deployment
     @PluginProperty(
             name = "network-max-count-attempts",
-            description = "Define the network max attempts to validate the Deployment (in seconds)",
+            description = "Max attempts (in seconds) on validating the Openshift Deployment " +
+                            "This values combining with network_attempts_time_interval will define " +
+                            "the time that Rundeck will wait to finished the Deployment on Openshift",
             required = true,
             defaultValue = "120",
             scope = PropertyScope.Framework
@@ -219,6 +146,86 @@ public class Deployment implements StepPlugin {
             scope = PropertyScope.Framework
     )
     private int network_attempts_time_interval;  // GLOBAL
+
+    // define the openshift server url
+    @PluginProperty(
+            name = "openshift-server-url",
+            description = "Openshift API Manager URL (ex: https://my.openshift.com:8443",
+            required = true,
+            scope = PropertyScope.Framework
+    )
+    private String openshift_server;        // GLOBAL
+
+    // define the openshfit api version
+    @PluginProperty(
+            name = "openshift-api-version",
+            description = "Openshift API Version (ex: v1, v2) \n " +
+                            "this will be translate to <openshift-server-url>/oapi/<version> when calling \n" +
+                            "the API resources from the Openshift Server.",
+            required = true,
+            defaultValue = "v1",
+            scope = PropertyScope.Framework
+    )
+    private String openshift_apiversion;    // GLOBAL
+
+    // define the Openshfit Username
+    @PluginProperty(
+            name = "openshift-username",
+            description = "Username to authenticate to Openshift API Manager.",
+            scope = PropertyScope.Framework
+    )
+    private String openshift_username;      // GLOBAL
+
+    // define the Openshift User password
+    @PluginProperty(
+            name = "openshift-password",
+            description = "User password to authenticate to Openshift API Manager",
+            scope = PropertyScope.Framework
+    )
+    private String openshift_password;      // GLOBAL
+
+    // define the Openshift token access
+    @PluginProperty(
+            name = "openshift-access-token",
+            description = "API Token authentication access \n" +
+                          "When token is defined, then will ignore the username/password variables",
+            scope = PropertyScope.Framework
+    )
+    private String openshift_token;         // GLOBAL
+
+    // define the Openshift project name.
+    @PluginProperty(
+            name = "Openshift Project Name",
+            description = "project name, where the services will be deployed",
+            required = true
+    )
+    private String openshift_project;       // LOCAL
+
+    // define the Openshift service name
+    @PluginProperty(
+            name = "Openshift Service Name",
+            description = "service name, define the services that will be deploed",
+            required = true
+    )
+    private String openshift_service;       // LOCAL
+
+    // define the gitlab password for authentication
+    @PluginProperty(
+            name = "Environment",
+            description = "Define the deployment environment, responsible to locate the " +
+                        "environment file inside the variable directory",
+            required = true,
+            defaultValue = "development"
+    )
+    private String gitlab_deployment_environment;
+
+    // define the gitlab password for authentication
+    @PluginProperty(
+            name = "Directory",
+            description = "Define the Directory where the deployment and variables files are located",
+            required = true
+    )
+    private String gitlab_deployment_directory;
 
     /**
      * Execute a step on Node
@@ -467,8 +474,17 @@ public class Deployment implements StepPlugin {
             }
 
             // Watching the Deployment of the Services.
-            for (int attempts = 0; (oc.notReady() && attempts < network_max_count_attemps); ++attempts) {
-                Thread.sleep((network_attempts_time_interval * 1000));
+            int attempts = 0;
+            while (oc.notReady()) {
+                if (attempts >= network_max_count_attemps) {
+                    throw new StepException(
+                            "Openshift deployment took to long to finished. ",
+                            StepFailureReason.PluginFailed
+                    );
+                }
+                else Thread.sleep(network_attempts_time_interval * 1000);
+
+                attempts += 1;
             }
 
             System.out.println(
