@@ -1,8 +1,29 @@
+/**
+ * Copyleft 2017 - RafaOS (rafaeloliveira.cs@gmail.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package br.com.raffs.rundeck.plugin.br.com.raffs.rundeck.plugin.core;
 
 import okhttp3.*;
+import org.json.JSONException;
 import org.json.JSONObject;
 
+import javax.xml.bind.DatatypeConverter;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.concurrent.TimeUnit;
 
 public class HTTPClient {
@@ -140,15 +161,15 @@ public class HTTPClient {
                             "ensure the path is given on arguments"
             );
 
-        System.out.println(this.joinPath(path));
         RequestBody body;
         Request request;
         switch (type) {
             case POST:
-                body = RequestBody.create(JSON, data.toString());
+                body = RequestBody.create(JSON, Utils.parserString(data.toString()));
                 if (this.authorization != null) {
                     request = new Request.Builder()
                             .addHeader("Authorization", this.authorization)
+                            .addHeader("Content-Type", "application/json")
                             .url(this.joinPath(path))
                             .post(body)
                             .build();
@@ -156,16 +177,19 @@ public class HTTPClient {
                 else {
                     request = new Request.Builder()
                             .url(this.joinPath(path))
+                            .addHeader("Content-Type", "application/json")
                             .post(body)
                             .build();
                 }
                 break;
 
             case PUT:
-                body = RequestBody.create(JSON, data.toString());
+
+                body = RequestBody.create(JSON, Utils.parserString(data.toString()));
                 if (this.authorization != null) {
                     request = new Request.Builder()
                             .addHeader("Authorization", this.authorization)
+                            .addHeader("Content-Type", "application/json")
                             .url(this.joinPath(path))
                             .put(body)
                             .build();
@@ -173,6 +197,7 @@ public class HTTPClient {
                 else {
                     request = new Request.Builder()
                             .url(this.joinPath(path))
+                            .addHeader("Content-Type", "application/json")
                             .put(body)
                             .build();
                 }
@@ -182,12 +207,14 @@ public class HTTPClient {
                 if (this.authorization != null) {
                     request = new Request.Builder()
                             .header("Authorization", this.authorization)
+                            .addHeader("Content-Type", "application/json")
                             .url(this.joinPath(path))
                             .build();
                 }
                 else {
                     request = new Request.Builder()
                             .url(this.joinPath(path))
+                            .addHeader("Content-Type", "application/json")
                             .build();
                 }
                 break;
@@ -201,9 +228,23 @@ public class HTTPClient {
         }
 
         if (request != null) {
-            Response httpResponse = client.newCall(request).execute();
-            response = new JSONObject(httpResponse.body().string());
-            response.put("statusCode", httpResponse.code());
+
+            Response httpResponse = null;
+            try {
+                httpResponse = client.newCall(request).execute();
+
+                response = new JSONObject(httpResponse.body().string());
+                response.put("statusCode", httpResponse.code());
+            }
+            catch (Exception ex) {
+                ex.printStackTrace();
+
+                response = new JSONObject();
+                if (httpResponse != null)  {
+                    response.put("statusCode", httpResponse.code());
+                }
+                else response.put("statusCode", 522);
+            }
             return response;
         }
         else throw new Exception("THe request data appear to be null. ");

@@ -1,5 +1,23 @@
+/**
+ * Copyleft 2017 - RafaOS (rafaeloliveira.cs@gmail.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package br.com.raffs.rundeck.plugin.br.com.raffs.rundeck.plugin.core;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 public class OpenshiftClient {
@@ -33,12 +51,19 @@ public class OpenshiftClient {
         if (project == null || service == null)
             throw new Exception(
                     String.format(
-                         "Either could not find the project/service %s/%s",
-                          project, service
+                            "Either could not find the project/service %s/%s",
+                            project, service
                     )
             );
 
-        String authorization = "Bearer fWyAQGCVg4WwMbI5P_ynMvPSAWahoSLMjeEIE_JB6fM";
+        // define the authorization.
+        String authorization = null;
+        if (this.username != null && this.password != null)
+            authorization = Utils.getToken(
+                this.serverUrl, this.username, this.password, this.timeout
+            );
+        else authorization = "Bearer " + this.token;
+
         this.client = new HTTPClient()
                 .withTimeout(this.timeout)
                 .withBaseUrl(this.serverUrl)
@@ -59,21 +84,21 @@ public class OpenshiftClient {
         if (client != null) {
 
             JSONObject response = client.get(
-                    this.joinPath("/oapi", ""));
+                    this.joinPath("/oapi", "/"));
 
             if (response != null) {
                 statusCode = response.getInt("statusCode");
             }
             else
-             throw new Exception(
-                     "Error on trying to connect with: " +
-                     this.joinPath("/oapi", "")
-             );
+                throw new Exception(
+                        "Error on trying to connect with: " +
+                                this.joinPath("/oapi", "")
+                );
         }
         else
-         throw new Exception(
-                 "Could not find valid open connection on " +
-                 "to httpclient inside the Openshift Client class"
+            throw new Exception(
+                    "Could not find valid open connection on " +
+                            "to httpclient inside the Openshift Client class"
             );
 
         return statusCode;
@@ -87,29 +112,17 @@ public class OpenshiftClient {
     public boolean checkProject(String project) throws Exception {
         if (client != null) {
             String path = this.joinPath("/oapi", "/projects/" + project);
-            int status = client.get(path).getInt("statusCode");
-            if (status != 200) {
+            JSONObject response = client.get(path);
 
-                if (status == 403 || status == 401)
-                    throw new Exception(
-                            String.format(
-                                    "[%d] Unauthorized to validate the project: on %s on %s",
-                                    status, project, serverUrl
-                            )
-                    );
-                else if (status == 404){
-                    throw new Exception(
-                            String.format(
-                                    "[%d] Unauthorized to validate the project: on %s on %s",
-                                    status, project, serverUrl
-                            )
-                    );
-                }
-                else
-                  throw new Exception(
-                        "Could not find the project instances" +
-                        " server connection returned error code: " + status
-                  );
+            int status;
+            if ((status = response.getInt("statusCode")) != 200) {
+                throw new Exception(
+                     String.format(
+                            "Receive error '%d' on try to validate whether the project '%s' exists: "
+                                    + "openshift message => %s",
+                            status, project, response.getString("message")
+                     )
+                );
             }
             else return true;
         }
@@ -117,6 +130,35 @@ public class OpenshiftClient {
             throw new Exception(
                 "Could not find any instance of http client please usage build syntax"
             );
+    }
+
+    /**
+     * Return true/false whethe the service already exists or not
+     * on the system.
+     *
+     * @param service
+     * @return
+     */
+    public boolean checkService(String service) throws Exception {
+        String path = this.joinPath("/oapi",
+                String.format(
+                        "/namespaces/%s/deploymentconfigs/%s",
+                        project, service
+                )
+        );
+
+        JSONObject response = client.get(path);
+        int status;
+        if ((status = response.getInt("statusCode")) != 200) {
+            throw new Exception(
+                    String.format(
+                            "Receive error '%d' on try to validate whether the service %s/%s exists: "
+                                    + "openshift message => %s",
+                            status, project, service, response.getString("message")
+                    )
+            );
+        }
+        else return true;
     }
 
     /**
@@ -138,36 +180,12 @@ public class OpenshiftClient {
 
         int status;
         if ((status = response.getInt("statusCode")) != 200) {
-            if (status == 401)
-                throw new Exception(
-                   String.format(
-                       "Unauthorized to request the service: %s from the project %s ",
-                       service, project
-                   )
-                );
-
-            else if (status == 403)
-                throw new Exception(
-                  String.format(
-                     "The service %s is forbidden to access on the project: %s",
-                      service, project
-                  )
-                );
-
-            else if (status == 404) {
-                throw new Exception(
+            throw new Exception(
                     String.format(
-                        "Unable to found the service: %s on project %s",
-                            service, project
+                            "Receive error '%d' on try get a Deployment Configuration on %s/%s: "
+                                    + "openshift message => %s",
+                            status, project, service, response.getString("message")
                     )
-                );
-            }
-
-            else throw new Exception(
-                String.format(
-                   "Receive error [%d] on try to return the Deployment Configuration: %s/%s",
-                        status, project, service
-                )
             );
         }
 
@@ -193,41 +211,153 @@ public class OpenshiftClient {
 
         int status;
         if ((status = response.getInt("statusCode")) != 200) {
-            if (status == 401)
-                throw new Exception(
-                   String.format(
-                           "Unauthorized to update the Deployment Configuration from: %s on project %s",
-                           service, project
-                   )
-                );
-
-            else if (status == 403)
-                throw new Exception(
-                     String.format(
-                        "Access to update the service: %s on Project: %s",
-                             service, project
-                     )
-                );
-
-            else if (status == 404)
-                throw new Exception(
+            throw new Exception(
                     String.format(
-                         "The resource %s/%s could not be found on the server",
-                            project, service
-                    )
-                );
-
-            else throw new Exception(
-                    String.format(
-                            "Receive error [%d] on try to return the Deployment Configuration: %s/%s",
-                            status, project, service
+                            "Receive error '%d' on try to update a Deployment Configuration on %s/%s: "
+                                    + "openshift message => %s",
+                            status, project, service, response.getString("message")
                     )
             );
-
         }
 
         return response;
     }
+
+    /**
+     * Given a Deployment Configuration, responsible to update the
+     * Deployment Configuration from the existing file.
+     *
+     * @param deployConfig
+     * @return
+     */
+    public JSONObject createDeploymentConfig(JSONObject deployConfig) throws Exception {
+        JSONObject response;
+        String path = this.joinPath("/oapi",
+            String.format("/namespaces/%s/deploymentconfigs", project)
+        );
+        response = client.post(path, deployConfig);
+
+        int status;
+        if ((status = response.getInt("statusCode")) != 200) {
+            throw new Exception(
+                  String.format(
+                     "Receive error '%d' on try to create a new Deployment Configuration on %s/%s: "
+                             + "openshift message => %s",
+                         status, project, service, response.getString("message")
+                     )
+                );
+        }
+
+        return response;
+    }
+
+    /**
+     * Responsible to watch the Deployment, basically execute
+     * the call to validate whether the numbers of updated containers
+     * is updated and ready to production.
+     *
+     * @return
+     */
+    public boolean notReady() throws Exception {
+        // Define the replicas updates.
+        int readyReplicas = 0;
+        int pendingReplicas = 0;
+        int failedReplicas = 0;
+
+        // Validate the deployment configs updates pods.
+        JSONObject response = getDeploymentConfig();
+        JSONObject podList = getPodStatus(response);
+
+        // go each pods and validate the status.
+        if (podList.has("items")) {
+            for (Object pods : podList.getJSONArray("items")) {
+                JSONObject pod = (JSONObject) pods;
+
+                if (pod.has("status")) {
+                    String podStatus = pod.getJSONObject("status").getString("phase");
+
+                    if (podStatus.equals("Pending"))
+                        pendingReplicas += 1;
+
+                    else if (podStatus.equals("Running")) {
+                        if (pod.getJSONObject("status").has("conditions")) {
+                            JSONArray objects = pod.getJSONObject("status").getJSONArray("conditions");
+
+                            // Go through each conditional to find the ready status.
+                            for (Object object : objects) {
+                                JSONObject condition = (JSONObject) object;
+
+                                if (condition.getString("type").equals("Ready")
+                                        && condition.getString("status").equals("True")) {
+
+                                    readyReplicas += 1;
+                                }
+                            }
+                        }
+                    }
+
+                    else if (podStatus.equals("Failed"))
+                        failedReplicas += 1;
+                }
+            }
+        }
+        else throw new Exception("Could not find any running/pending pods to validate !!!");
+
+        // throwing error on failed replicas.
+        if (failedReplicas > 0)
+             throw new Exception(
+                 String.format("[%d] replicas has failed deployment", failedReplicas)
+             );
+
+        // Change the deploy cycle when observed when it's finished.
+        int updatesReplicas = -1;
+        if (response.getJSONObject("status").has("updatedReplicas")) {
+            updatesReplicas = response.getJSONObject("status").getInt("updatedReplicas");
+        }
+
+        // define whether there's the same numbers of running and updated replicas.
+        return ! (pendingReplicas == 0 && readyReplicas == updatesReplicas);
+    }
+
+    /**
+     * Get Stauts from the running pods.
+     *
+     * @param deployConfig
+     * @return
+     * @throws Exception
+     */
+    public JSONObject getPodStatus(JSONObject deployConfig) throws Exception {
+        JSONObject returnResponse = null;
+
+        // Get parameters.
+        if (deployConfig.has("metadata") && deployConfig.has("status")) {
+            String project = deployConfig.getJSONObject("metadata").getString("namespace");
+            String resource = deployConfig.getJSONObject("metadata").getString("name");
+            int version = deployConfig.getJSONObject("status").getInt("latestVersion");
+
+            // Define the string format
+            String path = String.format("/api/v1/namespaces/%s/pods?labelSelector=deployment=%s-%d",
+                    project, resource, version);
+            returnResponse = client.get(path);
+
+            // Validate the request
+            int statusCode = (Integer) returnResponse.get("statusCode");
+            if (statusCode != 200) {
+
+                if (statusCode == 401 || statusCode == 403) {
+                    System.out.println("Unauthorized to rewrite the Deployment Configuration" +
+                            "Normally this happened when there's other Deployment already running");
+                }
+                else if (statusCode == 404) {
+                    System.out.println("Could not found Deployment Configuration");
+                }
+            }
+        }
+        else throw new Exception("Could not find metadata/status on deployment config json-schema");
+
+        return returnResponse;
+    }
+
 
     /**
      * Define the timeout connection on the Openshift API console.
@@ -276,7 +406,7 @@ public class OpenshiftClient {
     /**
      * Define the service.
      *
-     * @param servce
+     * @param service
      * @return
      */
     public OpenshiftClient withService(String service) {
@@ -329,5 +459,16 @@ public class OpenshiftClient {
             return String.format("%s/%s%s", api, apiVersion, path);
         }
         else return String.format("%s/v1/%s", api, path);
+    }
+
+    /**
+     * Define the API path based on type and versions.
+     *
+     * @param api
+     * @param path
+     * @return
+     */
+    private String joinPath(String path) {
+        return String.format(path);
     }
 }
