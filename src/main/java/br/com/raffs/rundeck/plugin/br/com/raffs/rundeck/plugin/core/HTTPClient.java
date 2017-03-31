@@ -235,9 +235,14 @@ public class HTTPClient {
 
                 response = new JSONObject(httpResponse.body().string());
                 response.put("statusCode", httpResponse.code());
+
+                httpResponse.body().close();
             }
             catch (Exception ex) {
-                ex.printStackTrace();
+                try {
+                    httpResponse.body().close();
+                }
+                catch (Exception _ex) { /* NOTHING */ }
 
                 response = new JSONObject();
                 if (httpResponse != null)  {
