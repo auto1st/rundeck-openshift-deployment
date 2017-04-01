@@ -42,8 +42,7 @@ import java.util.*;
 @Plugin(name = "openshift-deploy", service = ServiceNameConstants.WorkflowStep)
 @PluginDescription(
         title = "Openshift Deployment Orchestration",
-        description = "Responsible to control the Openshift Deployment Configuration and Deployment Actions" +
-                "\nConfluence: https://confluence.ci.gsnet.corp/display/ENGDEVBR/Deploy+Rundeck+Openshift+Plugin"
+        description = "Responsible to control the Openshift Deployment Configuration and Deployment Actions"
 )
 public class Deployment implements StepPlugin {
 
