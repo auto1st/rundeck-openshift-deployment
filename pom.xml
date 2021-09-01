@@ -97,7 +97,7 @@
         <dependency>
             <groupId>org.rundeck</groupId>
             <artifactId>rundeck-core</artifactId>
-            <version>2.6.9</version>
+            <version>3.3.14-20210827</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
